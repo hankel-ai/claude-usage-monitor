@@ -17,6 +17,8 @@
                       IsCheckable="True" Click="MockData_Click"/>
             <MenuItem x:Name="ShowResetTimersMenuItem" Header="Show Reset Timers"
                       IsCheckable="True" IsChecked="True" Click="ShowResetTimers_Click"/>
+            <MenuItem x:Name="PausePollingMenuItem" Header="Pause Polling"
+                      IsCheckable="True" Click="PausePolling_Click"/>
             <Separator/>
             <MenuItem Header="Settings..." Click="Settings_Click"/>
             <MenuItem Header="Refresh Now" Click="Refresh_Click"/>
@@ -31,94 +33,106 @@
             <DropShadowEffect BlurRadius="8" Opacity="0.4" ShadowDepth="2" Color="Black"/>
         </Border.Effect>
 
-        <Grid Margin="10,6">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="2"/>
-                <RowDefinition x:Name="FiveHourTimerRow" Height="Auto"/>
-                <RowDefinition Height="4"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="2"/>
-                <RowDefinition x:Name="SevenDayTimerRow" Height="Auto"/>
-            </Grid.RowDefinitions>
+        <Grid>
+            <Grid x:Name="ContentGrid" Margin="10,6">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="2"/>
+                    <RowDefinition x:Name="FiveHourTimerRow" Height="Auto"/>
+                    <RowDefinition Height="4"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="2"/>
+                    <RowDefinition x:Name="SevenDayTimerRow" Height="Auto"/>
+                </Grid.RowDefinitions>
 
-            <!-- 5-Hour Usage Meter -->
-            <Grid Grid.Row="0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="42"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <TextBlock Text="5-Hour" Foreground="#999" FontSize="9.5"
-                           FontFamily="Segoe UI" VerticalAlignment="Center"/>
-                <Border Grid.Column="1" Background="#2A2A2A" CornerRadius="3.5"
-                        Height="15" ClipToBounds="True"
-                        x:Name="FiveHourTrack"
-                        ToolTip="5-Hour: No data">
-                    <Grid>
-                        <!-- Delta layer (bright) — behind -->
-                        <Border x:Name="FiveHourDeltaFill" Background="#81C784"
-                                HorizontalAlignment="Left" Width="0"/>
-                        <!-- Base layer (normal color) — on top, covers non-delta -->
-                        <Border x:Name="FiveHourFill" Background="#4CAF50"
-                                HorizontalAlignment="Left" Width="0"/>
-                    </Grid>
-                </Border>
+                <!-- 5-Hour Usage Meter -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="42"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="5-Hour" Foreground="#999" FontSize="9.5"
+                               FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                    <Border Grid.Column="1" Background="#2A2A2A" CornerRadius="3.5"
+                            Height="15" ClipToBounds="True"
+                            x:Name="FiveHourTrack"
+                            ToolTip="5-Hour: No data">
+                        <Grid>
+                            <!-- Delta layer (bright) — behind -->
+                            <Border x:Name="FiveHourDeltaFill" Background="#81C784"
+                                    HorizontalAlignment="Left" Width="0"/>
+                            <!-- Base layer (normal color) — on top, covers non-delta -->
+                            <Border x:Name="FiveHourFill" Background="#4CAF50"
+                                    HorizontalAlignment="Left" Width="0"/>
+                        </Grid>
+                    </Border>
+                </Grid>
+
+                <!-- 5-Hour Reset Timer -->
+                <Grid Grid.Row="2" x:Name="FiveHourTimerPanel">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="42"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="1" Background="#1A1A1A" CornerRadius="1.5"
+                            Height="4" ClipToBounds="True"
+                            x:Name="FiveHourTimerTrack"
+                            ToolTip="5-Hour reset timer">
+                        <Border x:Name="FiveHourTimerFill" Background="#CC3333"
+                                CornerRadius="1.5" HorizontalAlignment="Left"
+                                Width="0" Opacity="0.85"/>
+                    </Border>
+                </Grid>
+
+                <!-- 7-Day Usage Meter -->
+                <Grid Grid.Row="4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="42"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="7-Day" Foreground="#999" FontSize="9.5"
+                               FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                    <Border Grid.Column="1" Background="#2A2A2A" CornerRadius="3.5"
+                            Height="15" ClipToBounds="True"
+                            x:Name="SevenDayTrack"
+                            ToolTip="7-Day: No data">
+                        <Grid>
+                            <!-- Delta layer (bright) — behind -->
+                            <Border x:Name="SevenDayDeltaFill" Background="#64B5F6"
+                                    HorizontalAlignment="Left" Width="0"/>
+                            <!-- Base layer (normal color) — on top, covers non-delta -->
+                            <Border x:Name="SevenDayFill" Background="#2196F3"
+                                    HorizontalAlignment="Left" Width="0"/>
+                        </Grid>
+                    </Border>
+                </Grid>
+
+                <!-- 7-Day Reset Timer -->
+                <Grid Grid.Row="6" x:Name="SevenDayTimerPanel">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="42"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="1" Background="#1A1A1A" CornerRadius="1.5"
+                            Height="4" ClipToBounds="True"
+                            x:Name="SevenDayTimerTrack"
+                            ToolTip="7-Day reset timer">
+                        <Border x:Name="SevenDayTimerFill" Background="#CC3333"
+                                CornerRadius="1.5" HorizontalAlignment="Left"
+                                Width="0" Opacity="0.85"/>
+                    </Border>
+                </Grid>
             </Grid>
 
-            <!-- 5-Hour Reset Timer -->
-            <Grid Grid.Row="2" x:Name="FiveHourTimerPanel">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="42"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <Border Grid.Column="1" Background="#1A1A1A" CornerRadius="1.5"
-                        Height="4" ClipToBounds="True"
-                        x:Name="FiveHourTimerTrack"
-                        ToolTip="5-Hour reset timer">
-                    <Border x:Name="FiveHourTimerFill" Background="#CC3333"
-                            CornerRadius="1.5" HorizontalAlignment="Left"
-                            Width="0" Opacity="0.85"/>
-                </Border>
-            </Grid>
+            <!-- MOCK watermark overlay (renders on top of content) -->
+            <TextBlock x:Name="MockWatermark" Text="MOCK" Visibility="Collapsed"
+                       Foreground="#30FFFFFF" FontSize="20" FontWeight="Bold"
+                       FontFamily="Segoe UI" HorizontalAlignment="Center"
+                       VerticalAlignment="Center" IsHitTestVisible="False"/>
 
-            <!-- 7-Day Usage Meter -->
-            <Grid Grid.Row="4">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="42"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <TextBlock Text="7-Day" Foreground="#999" FontSize="9.5"
-                           FontFamily="Segoe UI" VerticalAlignment="Center"/>
-                <Border Grid.Column="1" Background="#2A2A2A" CornerRadius="3.5"
-                        Height="15" ClipToBounds="True"
-                        x:Name="SevenDayTrack"
-                        ToolTip="7-Day: No data">
-                    <Grid>
-                        <!-- Delta layer (bright) — behind -->
-                        <Border x:Name="SevenDayDeltaFill" Background="#64B5F6"
-                                HorizontalAlignment="Left" Width="0"/>
-                        <!-- Base layer (normal color) — on top, covers non-delta -->
-                        <Border x:Name="SevenDayFill" Background="#2196F3"
-                                HorizontalAlignment="Left" Width="0"/>
-                    </Grid>
-                </Border>
-            </Grid>
-
-            <!-- 7-Day Reset Timer -->
-            <Grid Grid.Row="6" x:Name="SevenDayTimerPanel">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="42"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <Border Grid.Column="1" Background="#1A1A1A" CornerRadius="1.5"
-                        Height="4" ClipToBounds="True"
-                        x:Name="SevenDayTimerTrack"
-                        ToolTip="7-Day reset timer">
-                    <Border x:Name="SevenDayTimerFill" Background="#CC3333"
-                            CornerRadius="1.5" HorizontalAlignment="Left"
-                            Width="0" Opacity="0.85"/>
-                </Border>
-            </Grid>
+            <!-- Paused dim overlay (renders on top of content) -->
+            <Border x:Name="PausedOverlay" Background="#60000000" CornerRadius="8"
+                    Visibility="Collapsed" IsHitTestVisible="False"/>
         </Grid>
     </Border>
 </Window>

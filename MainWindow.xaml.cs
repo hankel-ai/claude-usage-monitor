@@ -16,6 +16,7 @@ public partial class MainWindow : Window
 
     private readonly ClaudeApiService _apiService;
     private bool _useMockData;
+    private bool _isPaused;
     private bool _showResetTimers = true;
     private UsageData _lastUsage = new();
     private double _prevFiveHour;
@@ -265,7 +266,19 @@ public partial class MainWindow : Window
     {
         _useMockData = MockDataMenuItem.IsChecked;
         if (_useMockData)
+        {
+            _apiService.StopPolling();
+            MockWatermark.Visibility = Visibility.Visible;
+            PausedOverlay.Visibility = Visibility.Collapsed;
+            _isPaused = false;
+            PausePollingMenuItem.IsChecked = false;
             OnUsageUpdated(ClaudeApiService.GetMockData());
+        }
+        else
+        {
+            MockWatermark.Visibility = Visibility.Collapsed;
+            ResumePolling();
+        }
     }
 
     private void ShowResetTimers_Click(object sender, RoutedEventArgs e)
@@ -273,14 +286,36 @@ public partial class MainWindow : Window
         SetTimerVisibility(ShowResetTimersMenuItem.IsChecked);
     }
 
+    private void PausePolling_Click(object sender, RoutedEventArgs e)
+    {
+        _isPaused = PausePollingMenuItem.IsChecked;
+        if (_isPaused)
+        {
+            _apiService.StopPolling();
+            PausedOverlay.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            PausedOverlay.Visibility = Visibility.Collapsed;
+            if (!_useMockData)
+                ResumePolling();
+        }
+    }
+
+    private void ResumePolling()
+    {
+        _apiService.StopPolling();
+        if (AppSettingsService.HasCredentials)
+            _apiService.StartPolling(AppSettingsService.Current.PollingIntervalSeconds);
+    }
+
     private void Settings_Click(object sender, RoutedEventArgs e)
     {
         var settingsWindow = new SettingsWindow { Owner = this };
         if (settingsWindow.ShowDialog() == true)
         {
-            _apiService.StopPolling();
-            if (AppSettingsService.HasCredentials)
-                _apiService.StartPolling(AppSettingsService.Current.PollingIntervalSeconds);
+            if (!_useMockData && !_isPaused)
+                ResumePolling();
         }
     }
 
@@ -291,9 +326,8 @@ public partial class MainWindow : Window
             OnUsageUpdated(ClaudeApiService.GetMockData());
             return;
         }
-        _apiService.StopPolling();
-        if (AppSettingsService.HasCredentials)
-            _apiService.StartPolling(AppSettingsService.Current.PollingIntervalSeconds);
+        if (!_isPaused)
+            ResumePolling();
     }
 
     private void Exit_Click(object sender, RoutedEventArgs e)
