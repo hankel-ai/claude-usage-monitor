@@ -174,7 +174,9 @@ The output executable is:
 bin\Release\net8.0-windows\win-x64\publish\ClaudeUsageMonitor.exe
 ```
 
-This is a **self-contained single `.exe`** (~147 MB) — no .NET runtime installation needed on the target machine. Copy it anywhere and run it directly.
+This is a **self-contained single `.exe`** (~154 MB) — no .NET runtime installation needed on the target machine. Copy this one file to any Windows 10/11 x64 machine and run it directly.
+
+> **Important:** Only the `.exe` inside the `publish\` folder is portable. The smaller `.exe` one level up (`bin\Release\net8.0-windows\win-x64\ClaudeUsageMonitor.exe`, ~9 MB) is framework-dependent and requires the .NET 8 runtime to be installed.
 
 ### Launch on Windows startup
 
