@@ -189,6 +189,16 @@ bin\Publish\ClaudeUsageMonitor.exe
 
 This is a **self-contained single `.exe`** (~155 MB) — no .NET runtime installation needed on the target machine. Copy this one file to any Windows 10/11 x64 machine and run it directly.
 
+#### Slim (framework-dependent) build
+
+If you already have the .NET 8 Desktop Runtime installed, you can produce a much smaller exe:
+
+```cmd
+dotnet publish -c Release --self-contained false -o bin\Publish
+```
+
+This produces a **~192 KB** exe that requires the [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) on the target machine.
+
 ### Launch on Windows startup
 
 In the app, right-click the widget and go to **Settings...** then check **Launch on Windows startup**. This adds a registry entry at `HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run` (no admin required). This only works when running the published `ClaudeUsageMonitor.exe`, not via `dotnet run`.
