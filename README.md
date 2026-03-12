@@ -97,6 +97,12 @@ cd ClaudeUsageMonitor
 dotnet build
 ```
 
+> **Note:** If `dotnet` is not recognized or says "No .NET SDKs were found", your system may have a runtime-only `dotnet.exe` on the PATH shadowing the SDK. Use the included `build.cmd` wrapper instead, which points directly to the SDK:
+>
+> ```cmd
+> .\build.cmd build
+> ```
+
 ## Running
 
 ### Development (from source)
@@ -105,10 +111,22 @@ dotnet build
 dotnet run
 ```
 
+Or via the wrapper:
+
+```cmd
+.\build.cmd run
+```
+
 ### Publishing a single-file executable
 
 ```cmd
 dotnet publish -c Release
+```
+
+Or via the wrapper:
+
+```cmd
+.\build.cmd publish -c Release
 ```
 
 The output executable is:
@@ -117,7 +135,7 @@ The output executable is:
 bin\Release\net8.0-windows\win-x64\publish\ClaudeUsageMonitor.exe
 ```
 
-This is a **self-contained single `.exe`** (~90 MB) — no .NET runtime installation needed on the target machine. Copy it anywhere and run it directly.
+This is a **self-contained single `.exe`** (~147 MB) — no .NET runtime installation needed on the target machine. Copy it anywhere and run it directly.
 
 ### Launch on Windows startup
 
