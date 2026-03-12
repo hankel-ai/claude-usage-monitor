@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Controls;
@@ -282,7 +283,15 @@ public partial class MainWindow : Window
 
     private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        var startLeft = Left;
+        var startTop = Top;
         DragMove();
+        if (Math.Abs(Left - startLeft) < 2 && Math.Abs(Top - startTop) < 2)
+        {
+            // Click without drag — open usage page
+            Process.Start(new ProcessStartInfo("https://claude.ai/settings/usage") { UseShellExecute = true });
+            return;
+        }
         AppSettingsService.Current.WindowLeft = Left;
         AppSettingsService.Current.WindowTop = Top;
         AppSettingsService.Save();
