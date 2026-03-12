@@ -7,12 +7,14 @@ A lightweight Windows desktop widget that displays your Claude AI usage as visua
 ## Features
 
 - **Two usage meters** — 5-hour (green) and 7-day (blue) utilization bars
+- **Delta highlights** — usage increase since last poll shown as a brighter strip at the end of each bar
 - **Reset timer bars** — optional thin red bars showing time elapsed in each rate limit window
 - **Color thresholds** — bars turn orange at 70% and red at 90%
 - **Always-on-top** — stays visible over other windows (toggleable)
-- **Hover tooltips** — shows exact percentage and time until reset
+- **Hover tooltips** — shows exact percentage, time until reset, and change since last poll
 - **Draggable** — click and drag anywhere; position is saved across restarts
 - **Configurable polling** — 30 seconds to 30 minutes (default: 2 minutes)
+- **Launch on startup** — optional Windows startup registration (no admin required)
 - **Animated transitions** — smooth bar fill animations on each update
 - **Tiny footprint** — ~25-50 MB RAM, single process, no browser engine
 
@@ -89,7 +91,7 @@ The app stores its own settings (polling interval, window position, always-on-to
 
 ## Building from source
 
-```bash
+```cmd
 git clone https://github.com/hankel-ai/claude-usage-monitor.git
 cd ClaudeUsageMonitor
 dotnet build
@@ -99,17 +101,27 @@ dotnet build
 
 ### Development (from source)
 
-```bash
+```cmd
 dotnet run
 ```
 
-### Published single-file executable
+### Publishing a single-file executable
 
-```bash
+```cmd
 dotnet publish -c Release
 ```
 
-The output is at `bin/Release/net8.0-windows/win-x64/publish/`. The published build is a **self-contained single .exe** — no .NET runtime installation needed on the target machine.
+The output executable is:
+
+```
+bin\Release\net8.0-windows\win-x64\publish\ClaudeUsageMonitor.exe
+```
+
+This is a **self-contained single `.exe`** (~90 MB) — no .NET runtime installation needed on the target machine. Copy it anywhere and run it directly.
+
+### Launch on Windows startup
+
+In the app, right-click the widget and go to **Settings...** then check **Launch on Windows startup**. This adds a registry entry at `HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run` (no admin required). This only works when running the published `ClaudeUsageMonitor.exe`, not via `dotnet run`.
 
 ## Usage
 
@@ -122,7 +134,7 @@ The widget appears as a small floating panel near the bottom-right of your scree
 | **Always on Top** | Toggle whether the widget stays above other windows |
 | **Use Mock Data** | Display sample data to test the UI without API calls |
 | **Show Reset Timers** | Toggle the thin red elapsed-time bars under each meter |
-| **Settings...** | Open the settings window (polling interval, credential status) |
+| **Settings...** | Open settings (polling interval, credentials status, startup toggle) |
 | **Refresh Now** | Immediately re-fetch usage data |
 | **Exit** | Close the app |
 
@@ -130,9 +142,11 @@ The widget appears as a small floating panel near the bottom-right of your scree
 
 | Utilization | Color |
 |------------|-------|
-| 0–69% | Green (5-hour) / Blue (7-day) |
-| 70–89% | Orange |
-| 90–100% | Red |
+| 0-69% | Green (5-hour) / Blue (7-day) |
+| 70-89% | Orange |
+| 90-100% | Red |
+
+The brighter strip at the end of each bar indicates the usage increase since the last poll.
 
 ## Troubleshooting
 
@@ -142,6 +156,7 @@ The widget appears as a small floating panel near the bottom-right of your scree
 | "Token expired" tooltip | Re-authenticate in Claude Code (`claude` in terminal). The app re-reads the token on each poll. |
 | "Usage API rate limited" tooltip | The Anthropic usage endpoint itself has rate limits. Increase your polling interval in Settings. |
 | Widget not visible | It defaults to bottom-right of the screen. Check near the taskbar. If lost, delete `%APPDATA%\ClaudeUsageMonitor\settings.json` to reset position. |
+| "Launch on startup" not working | This only works with the published `.exe`. Run `dotnet publish -c Release` first, then use `ClaudeUsageMonitor.exe` from the publish folder. |
 
 ## License
 
