@@ -15,7 +15,10 @@ A lightweight Windows desktop widget that displays your Claude AI usage as visua
 - **Draggable** — click and drag anywhere; position is saved across restarts
 - **Configurable polling** — 30 seconds to 30 minutes (default: 2 minutes)
 - **Launch on startup** — optional Windows startup registration (no admin required)
+- **Pause polling** — temporarily stop API calls; widget dims to indicate paused state
+- **Mock data mode** — test the UI with sample data (pauses polling, shows "MOCK" watermark)
 - **Animated transitions** — smooth bar fill animations on each update
+- **Crash logging** — unhandled errors are written to `crash.log` with a dialog
 - **Tiny footprint** — ~25-50 MB RAM, single process, no browser engine
 
 ## Requirements
@@ -88,6 +91,16 @@ The app stores its own settings (polling interval, window position, always-on-to
 ```
 %APPDATA%\ClaudeUsageMonitor\settings.json
 ```
+
+### Crash log
+
+If the app encounters an unhandled error, it shows a dialog and writes details to:
+
+```
+%APPDATA%\ClaudeUsageMonitor\crash.log
+```
+
+Check this file if the app fails to start or closes unexpectedly.
 
 ### Log file
 
@@ -191,10 +204,11 @@ The widget appears as a small floating panel near the bottom-right of your scree
 | Option | Description |
 |--------|-------------|
 | **Always on Top** | Toggle whether the widget stays above other windows |
-| **Use Mock Data** | Display sample data to test the UI without API calls |
+| **Use Mock Data** | Display sample data to test the UI without API calls. Pauses polling automatically and shows a "MOCK" watermark. Unchecking resumes polling. |
 | **Show Reset Timers** | Toggle the thin red elapsed-time bars under each meter |
+| **Pause Polling** | Stop API polling. The widget dims with a semi-transparent overlay to indicate it is paused. Unchecking resumes polling. |
 | **Settings...** | Open settings (polling interval, credentials status, startup toggle) |
-| **Refresh Now** | Immediately re-fetch usage data |
+| **Refresh Now** | Immediately re-fetch usage data (disabled while paused) |
 | **Exit** | Close the app |
 
 ### Meter colors
@@ -211,10 +225,13 @@ The brighter strip at the end of each bar indicates the usage increase since the
 
 | Problem | Solution |
 |---------|----------|
-| Bars stay empty | Hover to check tooltip — likely "No Claude Code credentials found". Run `claude` in a terminal and log in. |
+| App doesn't start / hourglass then nothing | Check `%APPDATA%\ClaudeUsageMonitor\crash.log` for error details. If no crash log exists, the app may have started but the widget is hard to see — look near the bottom-right of your screen. |
+| Widget shows "No credentials found" | Run `claude` in a terminal and log in. The app reads the token from `%USERPROFILE%\.claude\.credentials.json`. |
+| Bars stay empty | Hover to check tooltip. If it says "No Claude Code credentials found", see above. |
 | "Token expired" tooltip | Re-authenticate in Claude Code (`claude` in terminal). The app re-reads the token on each poll. |
 | Bars not updating / 429 in log | The Anthropic usage endpoint is rate limiting you. The app keeps showing the last known data. Increase your polling interval in Settings (try 5-10 min). Check `%APPDATA%\ClaudeUsageMonitor\log.txt` for details. |
 | Widget not visible | It defaults to bottom-right of the screen. Check near the taskbar. If lost, delete `%APPDATA%\ClaudeUsageMonitor\settings.json` to reset position. |
+| Copied exe doesn't work on another PC | Make sure you copied the **154 MB** exe from `bin\Release\...\publish\`, not the 9 MB one from the parent folder. The smaller one requires .NET 8 to be installed. |
 | "Launch on startup" not working | This only works with the published `.exe`. Run `dotnet publish -c Release` first, then use `ClaudeUsageMonitor.exe` from the publish folder. |
 
 ## License
