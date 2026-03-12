@@ -124,6 +124,12 @@
                 </Grid>
             </Grid>
 
+            <!-- Status text for no-credentials / errors -->
+            <TextBlock x:Name="StatusText" Visibility="Collapsed"
+                       Foreground="#80FFFFFF" FontSize="10" FontFamily="Segoe UI"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       IsHitTestVisible="False" TextAlignment="Center"/>
+
             <!-- MOCK watermark overlay (renders on top of content) -->
             <TextBlock x:Name="MockWatermark" Text="MOCK" Visibility="Collapsed"
                        Foreground="#30FFFFFF" FontSize="20" FontWeight="Bold"

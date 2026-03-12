@@ -64,8 +64,22 @@ public partial class MainWindow : Window
         }
         else
         {
+            ShowStatus("No credentials found\nRight-click \u2192 Settings");
             FiveHourTrack.ToolTip = "No Claude Code credentials found";
-            SevenDayTrack.ToolTip = "Log in via Claude Code first";
+            SevenDayTrack.ToolTip = "Run 'claude' in a terminal and log in";
+        }
+    }
+
+    private void ShowStatus(string? message)
+    {
+        if (message == null)
+        {
+            StatusText.Visibility = Visibility.Collapsed;
+        }
+        else
+        {
+            StatusText.Text = message;
+            StatusText.Visibility = Visibility.Visible;
         }
     }
 
@@ -90,6 +104,7 @@ public partial class MainWindow : Window
                 _hasReceivedData = true;
             }
 
+            ShowStatus(null);
             UpdateAllBars();
             UpdateTimerBars();
             FiveHourTrack.ToolTip = BuildTooltipWithDelta(usage.FiveHourTooltip, usage.FiveHourUtilization, _prevFiveHour);
