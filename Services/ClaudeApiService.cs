@@ -12,6 +12,7 @@ public class ClaudeApiService : IDisposable
 {
     private HttpClient? _httpClient;
     private Timer? _timer;
+    private UsageData? _lastSuccessfulUsage;
 
     public event Action<UsageData>? UsageUpdated;
     public event Action<string>? ErrorOccurred;
@@ -73,7 +74,9 @@ public class ClaudeApiService : IDisposable
 
             if (response.StatusCode == HttpStatusCode.TooManyRequests)
             {
-                ErrorOccurred?.Invoke("Usage API rate limited - will retry");
+                // Keep showing last known data instead of clearing bars
+                if (_lastSuccessfulUsage != null)
+                    UsageUpdated?.Invoke(_lastSuccessfulUsage);
                 return;
             }
 
@@ -81,6 +84,7 @@ public class ClaudeApiService : IDisposable
 
             var json = await response.Content.ReadAsStringAsync();
             var usage = ParseUsageResponse(json);
+            _lastSuccessfulUsage = usage;
             UsageUpdated?.Invoke(usage);
         }
         catch (TaskCanceledException)
