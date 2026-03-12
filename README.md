@@ -89,6 +89,45 @@ The app stores its own settings (polling interval, window position, always-on-to
 %APPDATA%\ClaudeUsageMonitor\settings.json
 ```
 
+### Log file
+
+The app writes a timestamped log of every API poll to:
+
+```
+%APPDATA%\ClaudeUsageMonitor\log.txt
+```
+
+Which resolves to (example):
+
+```
+C:\Users\YourUsername\AppData\Roaming\ClaudeUsageMonitor\log.txt
+```
+
+Each line includes the timestamp, log level, and event:
+
+```
+2026-03-12 14:30:02  INFO  Polling usage API...
+2026-03-12 14:30:03  OK    5h=6.0%  7d=35.0%
+2026-03-12 14:32:02  INFO  Polling usage API...
+2026-03-12 14:32:02  WARN  Rate limited (429) — keeping last known data
+```
+
+The log file is automatically truncated when it exceeds 1 MB. You can open it with any text editor or tail it in PowerShell:
+
+```cmd
+Get-Content "%APPDATA%\ClaudeUsageMonitor\log.txt" -Tail 20 -Wait
+```
+
+### API rate limiting
+
+The Anthropic usage endpoint (`/api/oauth/usage`) enforces its own rate limits, separate from the model API. If you poll too frequently, you'll receive HTTP 429 responses. When this happens:
+
+- The app **keeps displaying the last successfully fetched data** — bars won't go blank
+- The log file will show `WARN  Rate limited (429)` entries
+- Polling continues at the configured interval; the next successful response updates the bars normally
+
+To avoid rate limiting, increase the polling interval in **Settings** (default is 2 minutes, which is well within limits under normal use). If you're seeing persistent 429s, try 5 or 10 minutes.
+
 ## Building from source
 
 ```cmd
@@ -172,7 +211,7 @@ The brighter strip at the end of each bar indicates the usage increase since the
 |---------|----------|
 | Bars stay empty | Hover to check tooltip — likely "No Claude Code credentials found". Run `claude` in a terminal and log in. |
 | "Token expired" tooltip | Re-authenticate in Claude Code (`claude` in terminal). The app re-reads the token on each poll. |
-| "Usage API rate limited" tooltip | The Anthropic usage endpoint itself has rate limits. Increase your polling interval in Settings. |
+| Bars not updating / 429 in log | The Anthropic usage endpoint is rate limiting you. The app keeps showing the last known data. Increase your polling interval in Settings (try 5-10 min). Check `%APPDATA%\ClaudeUsageMonitor\log.txt` for details. |
 | Widget not visible | It defaults to bottom-right of the screen. Check near the taskbar. If lost, delete `%APPDATA%\ClaudeUsageMonitor\settings.json` to reset position. |
 | "Launch on startup" not working | This only works with the published `.exe`. Run `dotnet publish -c Release` first, then use `ClaudeUsageMonitor.exe` from the publish folder. |
 

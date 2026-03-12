@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Text.Json;
@@ -10,6 +11,10 @@ namespace ClaudeUsageMonitor.Services;
 
 public class ClaudeApiService : IDisposable
 {
+    private static readonly string LogPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "ClaudeUsageMonitor", "log.txt");
+
     private HttpClient? _httpClient;
     private Timer? _timer;
     private UsageData? _lastSuccessfulUsage;
@@ -17,6 +22,24 @@ public class ClaudeApiService : IDisposable
     public event Action<UsageData>? UsageUpdated;
     public event Action<string>? ErrorOccurred;
     public event Action? AuthExpired;
+
+    private static void Log(string message)
+    {
+        try
+        {
+            var dir = Path.GetDirectoryName(LogPath)!;
+            if (!Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+
+            // Keep log file under 1 MB — truncate when exceeded
+            if (File.Exists(LogPath) && new FileInfo(LogPath).Length > 1_000_000)
+                File.WriteAllText(LogPath, "");
+
+            File.AppendAllText(LogPath,
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  {message}{Environment.NewLine}");
+        }
+        catch { }
+    }
 
     private void EnsureHttpClient()
     {
@@ -52,21 +75,25 @@ public class ClaudeApiService : IDisposable
             var token = AppSettingsService.GetOAuthToken();
             if (string.IsNullOrEmpty(token))
             {
+                Log("WARN  No credentials found");
                 ErrorOccurred?.Invoke("No Claude Code credentials found");
                 return;
             }
 
             EnsureHttpClient();
 
+            Log("INFO  Polling usage API...");
             var request = new HttpRequestMessage(HttpMethod.Get, "/api/oauth/usage");
             request.Headers.Add("Authorization", $"Bearer {token}");
             request.Headers.Add("anthropic-beta", "oauth-2025-04-20");
 
             var response = await _httpClient!.SendAsync(request);
+            Log($"INFO  Response: {(int)response.StatusCode} {response.StatusCode}");
 
             if (response.StatusCode == HttpStatusCode.Unauthorized ||
                 response.StatusCode == HttpStatusCode.Forbidden)
             {
+                Log("WARN  Auth expired or forbidden");
                 AuthExpired?.Invoke();
                 ErrorOccurred?.Invoke("Token expired - re-login via Claude Code");
                 return;
@@ -74,6 +101,7 @@ public class ClaudeApiService : IDisposable
 
             if (response.StatusCode == HttpStatusCode.TooManyRequests)
             {
+                Log("WARN  Rate limited (429) — keeping last known data");
                 // Keep showing last known data instead of clearing bars
                 if (_lastSuccessfulUsage != null)
                     UsageUpdated?.Invoke(_lastSuccessfulUsage);
@@ -85,18 +113,22 @@ public class ClaudeApiService : IDisposable
             var json = await response.Content.ReadAsStringAsync();
             var usage = ParseUsageResponse(json);
             _lastSuccessfulUsage = usage;
+            Log($"OK    5h={usage.FiveHourUtilization:F1}%  7d={usage.SevenDayUtilization:F1}%");
             UsageUpdated?.Invoke(usage);
         }
         catch (TaskCanceledException)
         {
+            Log("ERROR Request timed out");
             ErrorOccurred?.Invoke("Request timed out");
         }
         catch (HttpRequestException ex)
         {
+            Log($"ERROR Network: {ex.Message}");
             ErrorOccurred?.Invoke($"Network error: {ex.Message}");
         }
         catch (Exception ex)
         {
+            Log($"ERROR {ex.Message}");
             ErrorOccurred?.Invoke($"Error: {ex.Message}");
         }
     }
