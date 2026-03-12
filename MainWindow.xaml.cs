@@ -11,8 +11,12 @@ namespace ClaudeUsageMonitor;
 
 public partial class MainWindow : Window
 {
+    private static readonly TimeSpan FiveHourWindow = TimeSpan.FromHours(5);
+    private static readonly TimeSpan SevenDayWindow = TimeSpan.FromDays(7);
+
     private readonly ClaudeApiService _apiService;
     private bool _useMockData;
+    private bool _showResetTimers = true;
     private UsageData _lastUsage = new();
 
     public MainWindow()
@@ -42,6 +46,8 @@ public partial class MainWindow : Window
 
         FiveHourTrack.SizeChanged += (_, _) => UpdateBarWidths();
         SevenDayTrack.SizeChanged += (_, _) => UpdateBarWidths();
+        FiveHourTimerTrack.SizeChanged += (_, _) => UpdateTimerBars();
+        SevenDayTimerTrack.SizeChanged += (_, _) => UpdateTimerBars();
 
         Loaded += OnLoaded;
     }
@@ -65,8 +71,10 @@ public partial class MainWindow : Window
         {
             _lastUsage = usage;
             UpdateBarWidths();
+            UpdateTimerBars();
             FiveHourTrack.ToolTip = usage.FiveHourTooltip;
             SevenDayTrack.ToolTip = usage.SevenDayTooltip;
+            UpdateTimerTooltips();
         });
     }
 
@@ -90,17 +98,71 @@ public partial class MainWindow : Window
         AnimateBar(SevenDayFill, SevenDayTrack.ActualWidth, _lastUsage.SevenDayUtilization, false);
     }
 
+    private void UpdateTimerBars()
+    {
+        if (!_showResetTimers) return;
+
+        var fiveHourElapsed = GetElapsedPercentage(_lastUsage.FiveHourResetsAt, FiveHourWindow);
+        var sevenDayElapsed = GetElapsedPercentage(_lastUsage.SevenDayResetsAt, SevenDayWindow);
+
+        AnimateTimerBar(FiveHourTimerFill, FiveHourTimerTrack.ActualWidth, fiveHourElapsed);
+        AnimateTimerBar(SevenDayTimerFill, SevenDayTimerTrack.ActualWidth, sevenDayElapsed);
+    }
+
+    private void UpdateTimerTooltips()
+    {
+        FiveHourTimerTrack.ToolTip = FormatTimerTooltip("5-Hour", _lastUsage.FiveHourResetsAt, FiveHourWindow);
+        SevenDayTimerTrack.ToolTip = FormatTimerTooltip("7-Day", _lastUsage.SevenDayResetsAt, SevenDayWindow);
+    }
+
+    private static double GetElapsedPercentage(DateTime? resetsAt, TimeSpan totalWindow)
+    {
+        if (!resetsAt.HasValue) return 0;
+        var remaining = resetsAt.Value - DateTime.UtcNow;
+        if (remaining.TotalSeconds <= 0) return 100;
+        var elapsed = totalWindow - remaining;
+        if (elapsed.TotalSeconds <= 0) return 0;
+        return Math.Min((elapsed / totalWindow) * 100, 100);
+    }
+
+    private static string FormatTimerTooltip(string label, DateTime? resetsAt, TimeSpan totalWindow)
+    {
+        if (!resetsAt.HasValue) return $"{label} reset: No data";
+        var remaining = resetsAt.Value - DateTime.UtcNow;
+        if (remaining.TotalSeconds <= 0) return $"{label}: Resetting now";
+        var elapsed = totalWindow - remaining;
+        var pct = Math.Min((elapsed / totalWindow) * 100, 100);
+        return $"{label} reset: {pct:F0}% elapsed ({FormatTimeSpan(remaining)} left)";
+    }
+
+    private static string FormatTimeSpan(TimeSpan ts)
+    {
+        if (ts.TotalDays >= 1) return $"{ts.Days}d {ts.Hours}h";
+        if (ts.TotalHours >= 1) return $"{ts.Hours}h {ts.Minutes}m";
+        return $"{ts.Minutes}m";
+    }
+
     private void AnimateBar(Border fill, double trackWidth, double percentage, bool isFiveHour)
     {
         if (trackWidth <= 0) return;
-
         var clamped = Math.Min(Math.Max(percentage, 0), 100);
-        var targetWidth = trackWidth * (clamped / 100.0);
         fill.Background = GetMeterBrush(clamped, isFiveHour);
-
         var animation = new DoubleAnimation
         {
-            To = targetWidth,
+            To = trackWidth * (clamped / 100.0),
+            Duration = TimeSpan.FromMilliseconds(400),
+            EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseInOut }
+        };
+        fill.BeginAnimation(WidthProperty, animation);
+    }
+
+    private static void AnimateTimerBar(Border fill, double trackWidth, double percentage)
+    {
+        if (trackWidth <= 0) return;
+        var clamped = Math.Min(Math.Max(percentage, 0), 100);
+        var animation = new DoubleAnimation
+        {
+            To = trackWidth * (clamped / 100.0),
             Duration = TimeSpan.FromMilliseconds(400),
             EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseInOut }
         };
@@ -114,6 +176,16 @@ public partial class MainWindow : Window
         return isFiveHour
             ? new SolidColorBrush(Color.FromRgb(76, 175, 80))
             : new SolidColorBrush(Color.FromRgb(33, 150, 243));
+    }
+
+    private void SetTimerVisibility(bool visible)
+    {
+        _showResetTimers = visible;
+        var vis = visible ? Visibility.Visible : Visibility.Collapsed;
+        FiveHourTimerPanel.Visibility = vis;
+        SevenDayTimerPanel.Visibility = vis;
+        Height = visible ? 80 : 68;
+        if (visible) UpdateTimerBars();
     }
 
     private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -136,6 +208,11 @@ public partial class MainWindow : Window
         _useMockData = MockDataMenuItem.IsChecked;
         if (_useMockData)
             OnUsageUpdated(ClaudeApiService.GetMockData());
+    }
+
+    private void ShowResetTimers_Click(object sender, RoutedEventArgs e)
+    {
+        SetTimerVisibility(ShowResetTimersMenuItem.IsChecked);
     }
 
     private void Settings_Click(object sender, RoutedEventArgs e)

@@ -5,7 +5,7 @@
         AllowsTransparency="True"
         Background="Transparent"
         ResizeMode="NoResize"
-        Width="220" Height="68"
+        Width="220" Height="80"
         ShowInTaskbar="False"
         MouseLeftButtonDown="Window_MouseLeftButtonDown">
 
@@ -15,6 +15,8 @@
                       IsCheckable="True" IsChecked="True" Click="AlwaysOnTop_Click"/>
             <MenuItem x:Name="MockDataMenuItem" Header="Use Mock Data"
                       IsCheckable="True" Click="MockData_Click"/>
+            <MenuItem x:Name="ShowResetTimersMenuItem" Header="Show Reset Timers"
+                      IsCheckable="True" IsChecked="True" Click="ShowResetTimers_Click"/>
             <Separator/>
             <MenuItem Header="Settings..." Click="Settings_Click"/>
             <MenuItem Header="Refresh Now" Click="Refresh_Click"/>
@@ -29,11 +31,15 @@
             <DropShadowEffect BlurRadius="8" Opacity="0.4" ShadowDepth="2" Color="Black"/>
         </Border.Effect>
 
-        <Grid Margin="10,7">
+        <Grid Margin="10,6">
             <Grid.RowDefinitions>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="5"/>
-                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="2"/>
+                <RowDefinition x:Name="FiveHourTimerRow" Height="Auto"/>
+                <RowDefinition Height="4"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="2"/>
+                <RowDefinition x:Name="SevenDayTimerRow" Height="Auto"/>
             </Grid.RowDefinitions>
 
             <!-- 5-Hour Usage Meter -->
@@ -54,8 +60,24 @@
                 </Border>
             </Grid>
 
+            <!-- 5-Hour Reset Timer -->
+            <Grid Grid.Row="2" x:Name="FiveHourTimerPanel">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="42"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="1" Background="#1A1A1A" CornerRadius="1.5"
+                        Height="4" ClipToBounds="True"
+                        x:Name="FiveHourTimerTrack"
+                        ToolTip="5-Hour reset timer">
+                    <Border x:Name="FiveHourTimerFill" Background="#CC3333"
+                            CornerRadius="1.5" HorizontalAlignment="Left"
+                            Width="0" Opacity="0.85"/>
+                </Border>
+            </Grid>
+
             <!-- 7-Day Usage Meter -->
-            <Grid Grid.Row="2">
+            <Grid Grid.Row="4">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="42"/>
                     <ColumnDefinition Width="*"/>
@@ -69,6 +91,22 @@
                     <Border x:Name="SevenDayFill" Background="#2196F3"
                             CornerRadius="3.5" HorizontalAlignment="Left"
                             Width="0"/>
+                </Border>
+            </Grid>
+
+            <!-- 7-Day Reset Timer -->
+            <Grid Grid.Row="6" x:Name="SevenDayTimerPanel">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="42"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="1" Background="#1A1A1A" CornerRadius="1.5"
+                        Height="4" ClipToBounds="True"
+                        x:Name="SevenDayTimerTrack"
+                        ToolTip="7-Day reset timer">
+                    <Border x:Name="SevenDayTimerFill" Background="#CC3333"
+                            CornerRadius="1.5" HorizontalAlignment="Left"
+                            Width="0" Opacity="0.85"/>
                 </Border>
             </Grid>
         </Grid>
