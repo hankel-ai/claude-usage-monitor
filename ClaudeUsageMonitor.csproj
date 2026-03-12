@@ -11,6 +11,7 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <Nullable>enable</Nullable>
+    <ApplicationIcon>app.ico</ApplicationIcon>
   </PropertyGroup>
 
   <!-- No external NuGet packages needed -->
