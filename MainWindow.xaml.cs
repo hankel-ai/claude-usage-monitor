@@ -18,6 +18,9 @@ public partial class MainWindow : Window
     private bool _useMockData;
     private bool _showResetTimers = true;
     private UsageData _lastUsage = new();
+    private double _prevFiveHour;
+    private double _prevSevenDay;
+    private bool _hasReceivedData;
 
     public MainWindow()
     {
@@ -44,8 +47,8 @@ public partial class MainWindow : Window
         _apiService.ErrorOccurred += OnError;
         _apiService.AuthExpired += OnAuthExpired;
 
-        FiveHourTrack.SizeChanged += (_, _) => UpdateBarWidths();
-        SevenDayTrack.SizeChanged += (_, _) => UpdateBarWidths();
+        FiveHourTrack.SizeChanged += (_, _) => UpdateAllBars();
+        SevenDayTrack.SizeChanged += (_, _) => UpdateAllBars();
         FiveHourTimerTrack.SizeChanged += (_, _) => UpdateTimerBars();
         SevenDayTimerTrack.SizeChanged += (_, _) => UpdateTimerBars();
 
@@ -69,13 +72,37 @@ public partial class MainWindow : Window
     {
         Dispatcher.Invoke(() =>
         {
+            // Capture previous values before updating
+            if (_hasReceivedData)
+            {
+                _prevFiveHour = _lastUsage.FiveHourUtilization;
+                _prevSevenDay = _lastUsage.SevenDayUtilization;
+            }
+
             _lastUsage = usage;
-            UpdateBarWidths();
+
+            if (!_hasReceivedData)
+            {
+                // First data — no delta to show
+                _prevFiveHour = usage.FiveHourUtilization;
+                _prevSevenDay = usage.SevenDayUtilization;
+                _hasReceivedData = true;
+            }
+
+            UpdateAllBars();
             UpdateTimerBars();
-            FiveHourTrack.ToolTip = usage.FiveHourTooltip;
-            SevenDayTrack.ToolTip = usage.SevenDayTooltip;
+            FiveHourTrack.ToolTip = BuildTooltipWithDelta(usage.FiveHourTooltip, usage.FiveHourUtilization, _prevFiveHour);
+            SevenDayTrack.ToolTip = BuildTooltipWithDelta(usage.SevenDayTooltip, usage.SevenDayUtilization, _prevSevenDay);
             UpdateTimerTooltips();
         });
+    }
+
+    private static string BuildTooltipWithDelta(string baseTooltip, double current, double previous)
+    {
+        var delta = current - previous;
+        if (Math.Abs(delta) < 0.05) return baseTooltip;
+        var sign = delta > 0 ? "+" : "";
+        return $"{baseTooltip}  ({sign}{delta:F1}% since last poll)";
     }
 
     private void OnError(string error)
@@ -92,10 +119,26 @@ public partial class MainWindow : Window
         Dispatcher.Invoke(() => _apiService.StopPolling());
     }
 
-    private void UpdateBarWidths()
+    private void UpdateAllBars()
     {
-        AnimateBar(FiveHourFill, FiveHourTrack.ActualWidth, _lastUsage.FiveHourUtilization, true);
-        AnimateBar(SevenDayFill, SevenDayTrack.ActualWidth, _lastUsage.SevenDayUtilization, false);
+        var fiveHourTrackW = FiveHourTrack.ActualWidth;
+        var sevenDayTrackW = SevenDayTrack.ActualWidth;
+
+        // Delta layers: full current width (bright color shows through where prev doesn't cover)
+        SetBarWidth(FiveHourDeltaFill, fiveHourTrackW, _lastUsage.FiveHourUtilization);
+        SetBarWidth(SevenDayDeltaFill, sevenDayTrackW, _lastUsage.SevenDayUtilization);
+
+        // Update delta colors based on threshold
+        FiveHourDeltaFill.Background = GetDeltaBrush(_lastUsage.FiveHourUtilization, true);
+        SevenDayDeltaFill.Background = GetDeltaBrush(_lastUsage.SevenDayUtilization, false);
+
+        // Base layers: previous width (normal color covers delta underneath)
+        // If usage decreased (reset), show no delta — just set prev to current
+        var fiveHourPrev = _lastUsage.FiveHourUtilization >= _prevFiveHour ? _prevFiveHour : _lastUsage.FiveHourUtilization;
+        var sevenDayPrev = _lastUsage.SevenDayUtilization >= _prevSevenDay ? _prevSevenDay : _lastUsage.SevenDayUtilization;
+
+        AnimateBar(FiveHourFill, fiveHourTrackW, fiveHourPrev, true);
+        AnimateBar(SevenDayFill, sevenDayTrackW, sevenDayPrev, false);
     }
 
     private void UpdateTimerBars()
@@ -142,10 +185,16 @@ public partial class MainWindow : Window
         return $"{ts.Minutes}m";
     }
 
+    private static void SetBarWidth(Border fill, double trackWidth, double percentage)
+    {
+        if (trackWidth <= 0) return;
+        fill.Width = trackWidth * (Math.Clamp(percentage, 0, 100) / 100.0);
+    }
+
     private void AnimateBar(Border fill, double trackWidth, double percentage, bool isFiveHour)
     {
         if (trackWidth <= 0) return;
-        var clamped = Math.Min(Math.Max(percentage, 0), 100);
+        var clamped = Math.Clamp(percentage, 0, 100);
         fill.Background = GetMeterBrush(clamped, isFiveHour);
         var animation = new DoubleAnimation
         {
@@ -159,7 +208,7 @@ public partial class MainWindow : Window
     private static void AnimateTimerBar(Border fill, double trackWidth, double percentage)
     {
         if (trackWidth <= 0) return;
-        var clamped = Math.Min(Math.Max(percentage, 0), 100);
+        var clamped = Math.Clamp(percentage, 0, 100);
         var animation = new DoubleAnimation
         {
             To = trackWidth * (clamped / 100.0),
@@ -176,6 +225,15 @@ public partial class MainWindow : Window
         return isFiveHour
             ? new SolidColorBrush(Color.FromRgb(76, 175, 80))
             : new SolidColorBrush(Color.FromRgb(33, 150, 243));
+    }
+
+    private static Brush GetDeltaBrush(double percentage, bool isFiveHour)
+    {
+        if (percentage >= 90) return new SolidColorBrush(Color.FromRgb(239, 154, 154)); // light red
+        if (percentage >= 70) return new SolidColorBrush(Color.FromRgb(255, 183, 77));  // light orange
+        return isFiveHour
+            ? new SolidColorBrush(Color.FromRgb(129, 199, 132)) // light green
+            : new SolidColorBrush(Color.FromRgb(100, 181, 246)); // light blue
     }
 
     private void SetTimerVisibility(bool visible)

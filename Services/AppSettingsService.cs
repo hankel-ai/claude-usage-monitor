@@ -1,7 +1,7 @@
 using System;
 using System.IO;
-using System.Text;
 using System.Text.Json;
+using Microsoft.Win32;
 
 namespace ClaudeUsageMonitor.Services;
 
@@ -103,4 +103,40 @@ public static class AppSettingsService
     public static bool HasCredentials => !string.IsNullOrEmpty(GetOAuthToken());
 
     public static string CredentialsFilePath => ClaudeCredentialsPath;
+
+    // --- Launch on Startup (HKCU registry, no admin needed) ---
+
+    private const string RunKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
+    private const string AppName = "ClaudeUsageMonitor";
+
+    public static bool GetLaunchOnStartup()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(RunKey, false);
+            return key?.GetValue(AppName) != null;
+        }
+        catch { return false; }
+    }
+
+    public static void SetLaunchOnStartup(bool enable)
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(RunKey, true);
+            if (key == null) return;
+
+            if (enable)
+            {
+                var exePath = Environment.ProcessPath;
+                if (!string.IsNullOrEmpty(exePath))
+                    key.SetValue(AppName, $"\"{exePath}\"");
+            }
+            else
+            {
+                key.DeleteValue(AppName, false);
+            }
+        }
+        catch { }
+    }
 }

@@ -11,6 +11,7 @@ public partial class SettingsWindow : Window
         InitializeComponent();
 
         IntervalSlider.Value = AppSettingsService.Current.PollingIntervalSeconds;
+        StartupCheckBox.IsChecked = AppSettingsService.GetLaunchOnStartup();
         UpdateIntervalLabel();
         UpdateAuthStatus();
     }
@@ -55,6 +56,7 @@ public partial class SettingsWindow : Window
     {
         AppSettingsService.Current.PollingIntervalSeconds = (int)IntervalSlider.Value;
         AppSettingsService.Save();
+        AppSettingsService.SetLaunchOnStartup(StartupCheckBox.IsChecked == true);
         DialogResult = true;
         Close();
     }

@@ -54,9 +54,14 @@
                         Height="15" ClipToBounds="True"
                         x:Name="FiveHourTrack"
                         ToolTip="5-Hour: No data">
-                    <Border x:Name="FiveHourFill" Background="#4CAF50"
-                            CornerRadius="3.5" HorizontalAlignment="Left"
-                            Width="0"/>
+                    <Grid>
+                        <!-- Delta layer (bright) — behind -->
+                        <Border x:Name="FiveHourDeltaFill" Background="#81C784"
+                                HorizontalAlignment="Left" Width="0"/>
+                        <!-- Base layer (normal color) — on top, covers non-delta -->
+                        <Border x:Name="FiveHourFill" Background="#4CAF50"
+                                HorizontalAlignment="Left" Width="0"/>
+                    </Grid>
                 </Border>
             </Grid>
 
@@ -88,9 +93,14 @@
                         Height="15" ClipToBounds="True"
                         x:Name="SevenDayTrack"
                         ToolTip="7-Day: No data">
-                    <Border x:Name="SevenDayFill" Background="#2196F3"
-                            CornerRadius="3.5" HorizontalAlignment="Left"
-                            Width="0"/>
+                    <Grid>
+                        <!-- Delta layer (bright) — behind -->
+                        <Border x:Name="SevenDayDeltaFill" Background="#64B5F6"
+                                HorizontalAlignment="Left" Width="0"/>
+                        <!-- Base layer (normal color) — on top, covers non-delta -->
+                        <Border x:Name="SevenDayFill" Background="#2196F3"
+                                HorizontalAlignment="Left" Width="0"/>
+                    </Grid>
                 </Border>
             </Grid>
 
