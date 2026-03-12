@@ -16,7 +16,7 @@ A lightweight Windows desktop widget that displays your Claude AI usage as visua
 - **Configurable polling** — 30 seconds to 30 minutes (default: 2 minutes)
 - **Launch on startup** — optional Windows startup registration (no admin required)
 - **Pause polling** — temporarily stop API calls; widget dims to indicate paused state
-- **Mock data mode** — test the UI with sample data (pauses polling, shows "MOCK" watermark)
+- **In-bar text** — shows percentage inside each bar; switches to countdown at 100%
 - **Animated transitions** — smooth bar fill animations on each update
 - **Crash logging** — unhandled errors are written to `crash.log` with a dialog
 - **Tiny footprint** — ~25-50 MB RAM, single process, no browser engine
@@ -172,24 +172,22 @@ Or via the wrapper:
 ### Publishing a single-file executable
 
 ```cmd
-dotnet publish -c Release
+dotnet publish -c Release -o bin\Publish
 ```
 
 Or via the wrapper:
 
 ```cmd
-.\build.cmd publish -c Release
+.\build.cmd publish -c Release -o bin\Publish
 ```
 
 The output executable is:
 
 ```
-bin\Release\net8.0-windows\win-x64\publish\ClaudeUsageMonitor.exe
+bin\Publish\ClaudeUsageMonitor.exe
 ```
 
-This is a **self-contained single `.exe`** (~154 MB) — no .NET runtime installation needed on the target machine. Copy this one file to any Windows 10/11 x64 machine and run it directly.
-
-> **Important:** Only the `.exe` inside the `publish\` folder is portable. The smaller `.exe` one level up (`bin\Release\net8.0-windows\win-x64\ClaudeUsageMonitor.exe`, ~9 MB) is framework-dependent and requires the .NET 8 runtime to be installed.
+This is a **self-contained single `.exe`** (~155 MB) — no .NET runtime installation needed on the target machine. Copy this one file to any Windows 10/11 x64 machine and run it directly.
 
 ### Launch on Windows startup
 
@@ -204,7 +202,6 @@ The widget appears as a small floating panel near the bottom-right of your scree
 | Option | Description |
 |--------|-------------|
 | **Always on Top** | Toggle whether the widget stays above other windows |
-| **Use Mock Data** | Display sample data to test the UI without API calls. Pauses polling automatically and shows a "MOCK" watermark. Unchecking resumes polling. |
 | **Show Reset Timers** | Toggle the thin red elapsed-time bars under each meter |
 | **Pause Polling** | Stop API polling. The widget dims with a semi-transparent overlay to indicate it is paused. Unchecking resumes polling. |
 | **Settings...** | Open settings (polling interval, credentials status, startup toggle) |
@@ -231,8 +228,8 @@ The brighter strip at the end of each bar indicates the usage increase since the
 | "Token expired" tooltip | Re-authenticate in Claude Code (`claude` in terminal). The app re-reads the token on each poll. |
 | Bars not updating / 429 in log | The Anthropic usage endpoint is rate limiting you. The app keeps showing the last known data. Increase your polling interval in Settings (try 5-10 min). Check `%APPDATA%\ClaudeUsageMonitor\log.txt` for details. |
 | Widget not visible | It defaults to bottom-right of the screen. Check near the taskbar. If lost, delete `%APPDATA%\ClaudeUsageMonitor\settings.json` to reset position. |
-| Copied exe doesn't work on another PC | Make sure you copied the **154 MB** exe from `bin\Release\...\publish\`, not the 9 MB one from the parent folder. The smaller one requires .NET 8 to be installed. |
-| "Launch on startup" not working | This only works with the published `.exe`. Run `dotnet publish -c Release` first, then use `ClaudeUsageMonitor.exe` from the publish folder. |
+| Copied exe doesn't work on another PC | Make sure you copied the **155 MB** exe from `bin\Publish\`, not a smaller framework-dependent build. The standalone exe includes the .NET runtime. |
+| "Launch on startup" not working | This only works with the published `.exe`. Run `dotnet publish -c Release -o bin\Publish` first, then use `ClaudeUsageMonitor.exe` from the `bin\Publish` folder. |
 
 ## License
 
