@@ -171,17 +171,6 @@ public class ClaudeApiService : IDisposable
         return usage;
     }
 
-    public static UsageData GetMockData()
-    {
-        return new UsageData
-        {
-            FiveHourUtilization = 42,
-            FiveHourResetsAt = DateTime.UtcNow.AddHours(3).AddMinutes(22),
-            SevenDayUtilization = 68,
-            SevenDayResetsAt = DateTime.UtcNow.AddDays(4).AddHours(7)
-        };
-    }
-
     public void Dispose()
     {
         StopPolling();

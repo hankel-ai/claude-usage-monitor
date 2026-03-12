@@ -9,12 +9,15 @@
         ShowInTaskbar="False"
         MouseLeftButtonDown="Window_MouseLeftButtonDown">
 
+    <Window.Resources>
+        <DropShadowEffect x:Key="BarTextShadow" BlurRadius="3" ShadowDepth="1"
+                          Opacity="0.8" Color="Black"/>
+    </Window.Resources>
+
     <Window.ContextMenu>
         <ContextMenu>
             <MenuItem x:Name="AlwaysOnTopMenuItem" Header="Always on Top"
                       IsCheckable="True" IsChecked="True" Click="AlwaysOnTop_Click"/>
-            <MenuItem x:Name="MockDataMenuItem" Header="Use Mock Data"
-                      IsCheckable="True" Click="MockData_Click"/>
             <MenuItem x:Name="ShowResetTimersMenuItem" Header="Show Reset Timers"
                       IsCheckable="True" IsChecked="True" Click="ShowResetTimers_Click"/>
             <MenuItem x:Name="PausePollingMenuItem" Header="Pause Polling"
@@ -64,6 +67,13 @@
                             <!-- Base layer (normal color) — on top, covers non-delta -->
                             <Border x:Name="FiveHourFill" Background="#4CAF50"
                                     HorizontalAlignment="Left" Width="0"/>
+                            <!-- Percentage / countdown text overlay -->
+                            <TextBlock x:Name="FiveHourBarText" Text=""
+                                       Foreground="White" FontSize="9" FontWeight="SemiBold"
+                                       FontFamily="Segoe UI"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       IsHitTestVisible="False"
+                                       Effect="{StaticResource BarTextShadow}"/>
                         </Grid>
                     </Border>
                 </Grid>
@@ -103,6 +113,13 @@
                             <!-- Base layer (normal color) — on top, covers non-delta -->
                             <Border x:Name="SevenDayFill" Background="#2196F3"
                                     HorizontalAlignment="Left" Width="0"/>
+                            <!-- Percentage / countdown text overlay -->
+                            <TextBlock x:Name="SevenDayBarText" Text=""
+                                       Foreground="White" FontSize="9" FontWeight="SemiBold"
+                                       FontFamily="Segoe UI"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       IsHitTestVisible="False"
+                                       Effect="{StaticResource BarTextShadow}"/>
                         </Grid>
                     </Border>
                 </Grid>
@@ -129,12 +146,6 @@
                        Foreground="#80FFFFFF" FontSize="10" FontFamily="Segoe UI"
                        HorizontalAlignment="Center" VerticalAlignment="Center"
                        IsHitTestVisible="False" TextAlignment="Center"/>
-
-            <!-- MOCK watermark overlay (renders on top of content) -->
-            <TextBlock x:Name="MockWatermark" Text="MOCK" Visibility="Collapsed"
-                       Foreground="#30FFFFFF" FontSize="20" FontWeight="Bold"
-                       FontFamily="Segoe UI" HorizontalAlignment="Center"
-                       VerticalAlignment="Center" IsHitTestVisible="False"/>
 
             <!-- Paused dim overlay (renders on top of content) -->
             <Border x:Name="PausedOverlay" Background="#60000000" CornerRadius="8"

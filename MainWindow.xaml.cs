@@ -15,7 +15,6 @@ public partial class MainWindow : Window
     private static readonly TimeSpan SevenDayWindow = TimeSpan.FromDays(7);
 
     private readonly ClaudeApiService _apiService;
-    private bool _useMockData;
     private bool _isPaused;
     private bool _showResetTimers = true;
     private UsageData _lastUsage = new();
@@ -107,6 +106,7 @@ public partial class MainWindow : Window
             ShowStatus(null);
             UpdateAllBars();
             UpdateTimerBars();
+            UpdateBarTexts();
             FiveHourTrack.ToolTip = BuildTooltipWithDelta(usage.FiveHourTooltip, usage.FiveHourUtilization, _prevFiveHour);
             SevenDayTrack.ToolTip = BuildTooltipWithDelta(usage.SevenDayTooltip, usage.SevenDayUtilization, _prevSevenDay);
             UpdateTimerTooltips();
@@ -172,6 +172,24 @@ public partial class MainWindow : Window
     {
         FiveHourTimerTrack.ToolTip = FormatTimerTooltip("5-Hour", _lastUsage.FiveHourResetsAt, FiveHourWindow);
         SevenDayTimerTrack.ToolTip = FormatTimerTooltip("7-Day", _lastUsage.SevenDayResetsAt, SevenDayWindow);
+    }
+
+    private void UpdateBarTexts()
+    {
+        FiveHourBarText.Text = GetBarText(_lastUsage.FiveHourUtilization, _lastUsage.FiveHourResetsAt);
+        SevenDayBarText.Text = GetBarText(_lastUsage.SevenDayUtilization, _lastUsage.SevenDayResetsAt);
+    }
+
+    private static string GetBarText(double utilization, DateTime? resetsAt)
+    {
+        if (utilization >= 100)
+        {
+            if (!resetsAt.HasValue) return "100%";
+            var remaining = resetsAt.Value - DateTime.UtcNow;
+            if (remaining.TotalSeconds <= 0) return "Resetting...";
+            return FormatTimeSpan(remaining);
+        }
+        return $"{utilization:F0}%";
     }
 
     private static double GetElapsedPercentage(DateTime? resetsAt, TimeSpan totalWindow)
@@ -277,25 +295,6 @@ public partial class MainWindow : Window
         AppSettingsService.Save();
     }
 
-    private void MockData_Click(object sender, RoutedEventArgs e)
-    {
-        _useMockData = MockDataMenuItem.IsChecked;
-        if (_useMockData)
-        {
-            _apiService.StopPolling();
-            MockWatermark.Visibility = Visibility.Visible;
-            PausedOverlay.Visibility = Visibility.Collapsed;
-            _isPaused = false;
-            PausePollingMenuItem.IsChecked = false;
-            OnUsageUpdated(ClaudeApiService.GetMockData());
-        }
-        else
-        {
-            MockWatermark.Visibility = Visibility.Collapsed;
-            ResumePolling();
-        }
-    }
-
     private void ShowResetTimers_Click(object sender, RoutedEventArgs e)
     {
         SetTimerVisibility(ShowResetTimersMenuItem.IsChecked);
@@ -312,8 +311,7 @@ public partial class MainWindow : Window
         else
         {
             PausedOverlay.Visibility = Visibility.Collapsed;
-            if (!_useMockData)
-                ResumePolling();
+            ResumePolling();
         }
     }
 
@@ -329,18 +327,13 @@ public partial class MainWindow : Window
         var settingsWindow = new SettingsWindow { Owner = this };
         if (settingsWindow.ShowDialog() == true)
         {
-            if (!_useMockData && !_isPaused)
+            if (!_isPaused)
                 ResumePolling();
         }
     }
 
     private void Refresh_Click(object sender, RoutedEventArgs e)
     {
-        if (_useMockData)
-        {
-            OnUsageUpdated(ClaudeApiService.GetMockData());
-            return;
-        }
         if (!_isPaused)
             ResumePolling();
     }
