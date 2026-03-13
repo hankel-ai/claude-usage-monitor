@@ -2,23 +2,30 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Claude Usage Monitor - Settings"
-        Width="480" Height="420"
+        Width="480" Height="460"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         Background="#1E1E1E">
 
     <Grid Margin="16">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Polling Settings -->
-        <GroupBox Grid.Row="0" Header="Polling Interval" Margin="0,0,0,12"
+        <GroupBox Grid.Row="0" Header="Settings" Margin="0,0,0,12"
                   Foreground="#CCC" BorderBrush="#444">
             <StackPanel Margin="10,8">
+
+                <!-- Launch on Windows startup -->
+                <CheckBox x:Name="StartupCheckBox" Content="Launch on Windows startup"
+                          Foreground="#CCC" FontSize="12"/>
+                <TextBlock Foreground="#666" FontSize="10.5" Margin="0,4,0,0"
+                           Text="Adds to HKCU\...\Run registry key (no admin required). Only works with the published .exe."/>
+
+                <!-- Polling Interval -->
+                <TextBlock Text="Polling interval" Foreground="#CCC" FontSize="12"
+                           Margin="0,16,0,4"/>
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -38,35 +45,10 @@
                 </Grid>
                 <TextBlock Text="How often to fetch usage data from api.anthropic.com"
                            Foreground="#777" FontSize="11" Margin="0,4,0,0"/>
-            </StackPanel>
-        </GroupBox>
 
-        <!-- Credentials Status -->
-        <GroupBox Grid.Row="1" Header="Claude Code Credentials" Margin="0,0,0,12"
-                  Foreground="#CCC" BorderBrush="#444">
-            <StackPanel Margin="10,8">
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                    <Ellipse x:Name="AuthStatusDot" Width="10" Height="10" Margin="0,0,8,0"/>
-                    <TextBlock x:Name="AuthStatusLabel" Foreground="#AAA" FontSize="12"
-                               VerticalAlignment="Center"/>
-                </StackPanel>
-                <TextBlock x:Name="CredPathLabel" Foreground="#555" FontSize="10.5"
-                           TextWrapping="Wrap" Margin="0,0,0,4"/>
-                <TextBlock Foreground="#666" FontSize="10.5" TextWrapping="Wrap"
-                           Text="Token is read from Claude Code's credentials file. If missing, run 'claude' in a terminal and log in."/>
-            </StackPanel>
-        </GroupBox>
-
-        <!-- General -->
-        <GroupBox Grid.Row="2" Header="General" Margin="0,0,0,12"
-                  Foreground="#CCC" BorderBrush="#444">
-            <StackPanel Margin="10,8">
-                <CheckBox x:Name="StartupCheckBox" Content="Launch on Windows startup"
-                          Foreground="#CCC" FontSize="12"/>
-                <TextBlock Foreground="#666" FontSize="10.5" Margin="0,4,0,0"
-                           Text="Adds to HKCU\...\Run registry key (no admin required). Only works with the published .exe."/>
+                <!-- Hover Zoom Delay -->
                 <TextBlock Text="Hover zoom delay" Foreground="#CCC" FontSize="12"
-                           Margin="0,12,0,4"/>
+                           Margin="0,16,0,4"/>
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -86,12 +68,28 @@
                 </Grid>
                 <TextBlock Text="Delay before magnifying on hover (0 = instant)"
                            Foreground="#777" FontSize="11" Margin="0,4,0,0"/>
+
+                <!-- Credentials Status -->
+                <Border BorderBrush="#333" BorderThickness="0,1,0,0" Margin="0,16,0,0" Padding="0,12,0,0">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                            <Ellipse x:Name="AuthStatusDot" Width="10" Height="10" Margin="0,0,8,0"/>
+                            <TextBlock x:Name="AuthStatusLabel" Foreground="#AAA" FontSize="12"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <TextBlock x:Name="CredPathLabel" Foreground="#555" FontSize="10.5"
+                                   TextWrapping="Wrap" Margin="0,0,0,4"/>
+                        <TextBlock Foreground="#666" FontSize="10.5" TextWrapping="Wrap"
+                                   Text="Token is read from Claude Code's credentials file. If missing, run 'claude' in a terminal and log in."/>
+                    </StackPanel>
+                </Border>
+
             </StackPanel>
         </GroupBox>
 
         <!-- Save / Cancel -->
-        <StackPanel Grid.Row="3" Orientation="Horizontal"
-                    HorizontalAlignment="Right" Margin="0,12,0,0">
+        <StackPanel Grid.Row="1" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Margin="0,0,0,0">
             <Button Content="Save" Padding="20,7" Margin="0,0,8,0"
                     Click="Save_Click" IsDefault="True"
                     Background="#4CAF50" Foreground="White" BorderThickness="0"

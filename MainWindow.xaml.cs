@@ -300,14 +300,27 @@ public partial class MainWindow : Window
         if (visible) UpdateTimerBars();
     }
 
+    private static readonly Brush DragBorderBrush = new SolidColorBrush(Color.FromArgb(0xCC, 0x44, 0x88, 0xFF));
+    private static readonly Brush NormalBorderBrush = new SolidColorBrush(Color.FromArgb(0x40, 0xFF, 0xFF, 0xFF));
+
     private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         _hoverDelayTimer?.Stop();
         _suppressZoom = true;
         AnimateScale(1.0, 100);
+
+        // Highlight border during drag
+        OuterBorder.BorderBrush = DragBorderBrush;
+        OuterBorder.BorderThickness = new Thickness(2);
+
         var startLeft = Left;
         var startTop = Top;
         DragMove();
+
+        // Restore border after drag
+        OuterBorder.BorderBrush = NormalBorderBrush;
+        OuterBorder.BorderThickness = new Thickness(1);
+
         if (Math.Abs(Left - startLeft) < 2 && Math.Abs(Top - startTop) < 2)
         {
             // Click without drag — open usage page

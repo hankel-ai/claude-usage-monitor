@@ -31,7 +31,7 @@
     </Window.ContextMenu>
 
     <Border x:Name="OuterBorder" Background="#E6181818" CornerRadius="8"
-            BorderBrush="#40FFFFFF" BorderThickness="0.5"
+            BorderBrush="#40FFFFFF" BorderThickness="1"
             Width="220" Height="80"
             HorizontalAlignment="Center" VerticalAlignment="Center"
             RenderTransformOrigin="0.5,0.5"
