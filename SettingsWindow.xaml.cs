@@ -11,8 +11,10 @@ public partial class SettingsWindow : Window
         InitializeComponent();
 
         IntervalSlider.Value = AppSettingsService.Current.PollingIntervalSeconds;
+        HoverDelaySlider.Value = AppSettingsService.Current.HoverZoomDelayMs;
         StartupCheckBox.IsChecked = AppSettingsService.GetLaunchOnStartup();
         UpdateIntervalLabel();
+        UpdateHoverDelayLabel();
         UpdateAuthStatus();
     }
 
@@ -52,9 +54,22 @@ public partial class SettingsWindow : Window
         }
     }
 
+    private void HoverDelaySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        UpdateHoverDelayLabel();
+    }
+
+    private void UpdateHoverDelayLabel()
+    {
+        if (HoverDelayLabel == null) return;
+        var ms = (int)HoverDelaySlider.Value;
+        HoverDelayLabel.Text = ms == 0 ? "Instant" : $"{ms}ms";
+    }
+
     private void Save_Click(object sender, RoutedEventArgs e)
     {
         AppSettingsService.Current.PollingIntervalSeconds = (int)IntervalSlider.Value;
+        AppSettingsService.Current.HoverZoomDelayMs = (int)HoverDelaySlider.Value;
         AppSettingsService.Save();
         AppSettingsService.SetLaunchOnStartup(StartupCheckBox.IsChecked == true);
         DialogResult = true;

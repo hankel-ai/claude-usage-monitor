@@ -65,6 +65,27 @@
                           Foreground="#CCC" FontSize="12"/>
                 <TextBlock Foreground="#666" FontSize="10.5" Margin="0,4,0,0"
                            Text="Adds to HKCU\...\Run registry key (no admin required). Only works with the published .exe."/>
+                <TextBlock Text="Hover zoom delay" Foreground="#CCC" FontSize="12"
+                           Margin="0,12,0,4"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Slider x:Name="HoverDelaySlider"
+                            Minimum="0" Maximum="2000"
+                            Value="300"
+                            TickFrequency="100"
+                            IsSnapToTickEnabled="True"
+                            VerticalAlignment="Center"
+                            ValueChanged="HoverDelaySlider_ValueChanged"/>
+                    <TextBlock x:Name="HoverDelayLabel" Grid.Column="1"
+                               Foreground="#EEE" FontSize="13" FontWeight="SemiBold"
+                               Width="80" TextAlignment="Right"
+                               VerticalAlignment="Center" Margin="12,0,0,0"/>
+                </Grid>
+                <TextBlock Text="Delay before magnifying on hover (0 = instant)"
+                           Foreground="#777" FontSize="11" Margin="0,4,0,0"/>
             </StackPanel>
         </GroupBox>
 

@@ -11,6 +11,7 @@ public class AppSettingsData
     public bool AlwaysOnTop { get; set; } = true;
     public double WindowLeft { get; set; } = -1;
     public double WindowTop { get; set; } = -1;
+    public int HoverZoomDelayMs { get; set; } = 300;
 }
 
 public static class AppSettingsService
@@ -138,5 +139,15 @@ public static class AppSettingsService
             }
         }
         catch { }
+    }
+
+    /// <summary>
+    /// If startup is enabled, update the registry path to the current exe location.
+    /// Call on app launch so the startup entry stays correct after moving the exe.
+    /// </summary>
+    public static void UpdateStartupPath()
+    {
+        if (GetLaunchOnStartup())
+            SetLaunchOnStartup(true);
     }
 }

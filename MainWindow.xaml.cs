@@ -5,6 +5,7 @@ using System.Windows.Input;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Threading;
 using ClaudeUsageMonitor.Models;
 using ClaudeUsageMonitor.Services;
 
@@ -25,6 +26,8 @@ public partial class MainWindow : Window
     private double _prevFiveHour;
     private double _prevSevenDay;
     private bool _hasReceivedData;
+    private bool _suppressZoom;
+    private DispatcherTimer? _hoverDelayTimer;
 
     public MainWindow()
     {
@@ -299,6 +302,8 @@ public partial class MainWindow : Window
 
     private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        _hoverDelayTimer?.Stop();
+        _suppressZoom = true;
         AnimateScale(1.0, 100);
         var startLeft = Left;
         var startTop = Top;
@@ -372,11 +377,28 @@ public partial class MainWindow : Window
 
     private void OuterBorder_MouseEnter(object sender, MouseEventArgs e)
     {
-        AnimateScale(1.5, 150);
+        if (_suppressZoom) return;
+        var delayMs = AppSettingsService.Current.HoverZoomDelayMs;
+        if (delayMs <= 0)
+        {
+            AnimateScale(1.5, 150);
+            return;
+        }
+        _hoverDelayTimer?.Stop();
+        _hoverDelayTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(delayMs) };
+        _hoverDelayTimer.Tick += (_, _) =>
+        {
+            _hoverDelayTimer.Stop();
+            if (!_suppressZoom)
+                AnimateScale(1.5, 150);
+        };
+        _hoverDelayTimer.Start();
     }
 
     private void OuterBorder_MouseLeave(object sender, MouseEventArgs e)
     {
+        _hoverDelayTimer?.Stop();
+        _suppressZoom = false;
         AnimateScale(1.0, 150);
     }
 

@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Windows;
+using ClaudeUsageMonitor.Services;
 
 namespace ClaudeUsageMonitor;
 
@@ -24,6 +25,8 @@ public partial class App : Application
                 MessageBoxButton.OK, MessageBoxImage.Error);
             args.Handled = true;
         };
+
+        AppSettingsService.UpdateStartupPath();
 
         base.OnStartup(e);
     }
