@@ -1,0 +1,30 @@
+@echo off
+set DOTNET=%LOCALAPPDATA%\dotnet\dotnet.exe
+set DEST=C:\Users\admin\OneDrive\ClaudeUsageMonitor.exe
+
+if not exist "%DOTNET%" (
+    echo ERROR: .NET 8 SDK not found at %DOTNET%
+    exit /b 1
+)
+
+echo === Building single-file EXE ===
+"%DOTNET%" publish -c Release --no-restore 2>nul || "%DOTNET%" publish -c Release
+if errorlevel 1 (
+    echo BUILD FAILED
+    exit /b 1
+)
+
+echo === Stopping running instance ===
+taskkill /f /im ClaudeUsageMonitor.exe >nul 2>&1
+timeout /t 1 /nobreak >nul
+
+echo === Copying to %DEST% ===
+copy /y "bin\Release\net8.0-windows\win-x64\publish\ClaudeUsageMonitor.exe" "%DEST%"
+if errorlevel 1 (
+    echo COPY FAILED
+    exit /b 1
+)
+
+echo === Starting ===
+start "" "%DEST%"
+echo Done.
