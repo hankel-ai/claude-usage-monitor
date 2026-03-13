@@ -15,6 +15,9 @@ public partial class MainWindow : Window
     private static readonly TimeSpan FiveHourWindow = TimeSpan.FromHours(5);
     private static readonly TimeSpan SevenDayWindow = TimeSpan.FromDays(7);
 
+    private static readonly double BaseContentWidth = 220;
+    private static readonly double BaseContentHeight = 80;
+
     private readonly ClaudeApiService _apiService;
     private bool _isPaused;
     private bool _showResetTimers = true;
@@ -39,8 +42,10 @@ public partial class MainWindow : Window
         else
         {
             var area = SystemParameters.WorkArea;
-            Left = area.Right - Width - 10;
-            Top = area.Bottom - Height - 10;
+            var padX = (Width - BaseContentWidth) / 2;
+            var padY = (Height - BaseContentHeight) / 2;
+            Left = area.Right - BaseContentWidth - 10 - padX;
+            Top = area.Bottom - BaseContentHeight - 10 - padY;
         }
 
         _apiService = new ClaudeApiService();
@@ -167,6 +172,17 @@ public partial class MainWindow : Window
 
         AnimateTimerBar(FiveHourTimerFill, FiveHourTimerTrack.ActualWidth, fiveHourElapsed);
         AnimateTimerBar(SevenDayTimerFill, SevenDayTimerTrack.ActualWidth, sevenDayElapsed);
+
+        FiveHourTimerText.Text = GetTimerBarText(_lastUsage.FiveHourResetsAt);
+        SevenDayTimerText.Text = GetTimerBarText(_lastUsage.SevenDayResetsAt);
+    }
+
+    private static string GetTimerBarText(DateTime? resetsAt)
+    {
+        if (!resetsAt.HasValue) return "";
+        var remaining = resetsAt.Value - DateTime.UtcNow;
+        if (remaining.TotalSeconds <= 0) return "resetting...";
+        return FormatTimeSpan(remaining);
     }
 
     private void UpdateTimerTooltips()
@@ -277,12 +293,13 @@ public partial class MainWindow : Window
         var vis = visible ? Visibility.Visible : Visibility.Collapsed;
         FiveHourTimerPanel.Visibility = vis;
         SevenDayTimerPanel.Visibility = vis;
-        Height = visible ? 80 : 68;
+        OuterBorder.Height = visible ? 80 : 68;
         if (visible) UpdateTimerBars();
     }
 
     private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        AnimateScale(1.0, 100);
         var startLeft = Left;
         var startTop = Top;
         DragMove();
@@ -351,6 +368,28 @@ public partial class MainWindow : Window
     {
         _apiService.Dispose();
         Application.Current.Shutdown();
+    }
+
+    private void OuterBorder_MouseEnter(object sender, MouseEventArgs e)
+    {
+        AnimateScale(1.5, 150);
+    }
+
+    private void OuterBorder_MouseLeave(object sender, MouseEventArgs e)
+    {
+        AnimateScale(1.0, 150);
+    }
+
+    private void AnimateScale(double targetScale, int durationMs)
+    {
+        var anim = new DoubleAnimation
+        {
+            To = targetScale,
+            Duration = TimeSpan.FromMilliseconds(durationMs),
+            EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseInOut }
+        };
+        BorderScale.BeginAnimation(ScaleTransform.ScaleXProperty, anim);
+        BorderScale.BeginAnimation(ScaleTransform.ScaleYProperty, anim);
     }
 
     protected override void OnClosed(EventArgs e)

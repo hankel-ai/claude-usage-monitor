@@ -5,7 +5,7 @@
         AllowsTransparency="True"
         Background="Transparent"
         ResizeMode="NoResize"
-        Width="220" Height="80"
+        Width="330" Height="120"
         ShowInTaskbar="False"
         MouseLeftButtonDown="Window_MouseLeftButtonDown">
 
@@ -30,8 +30,15 @@
         </ContextMenu>
     </Window.ContextMenu>
 
-    <Border Background="#E6181818" CornerRadius="8"
-            BorderBrush="#40FFFFFF" BorderThickness="0.5">
+    <Border x:Name="OuterBorder" Background="#E6181818" CornerRadius="8"
+            BorderBrush="#40FFFFFF" BorderThickness="0.5"
+            Width="220" Height="80"
+            HorizontalAlignment="Center" VerticalAlignment="Center"
+            RenderTransformOrigin="0.5,0.5"
+            MouseEnter="OuterBorder_MouseEnter" MouseLeave="OuterBorder_MouseLeave">
+        <Border.RenderTransform>
+            <ScaleTransform x:Name="BorderScale" ScaleX="1" ScaleY="1"/>
+        </Border.RenderTransform>
         <Border.Effect>
             <DropShadowEffect BlurRadius="8" Opacity="0.4" ShadowDepth="2" Color="Black"/>
         </Border.Effect>
@@ -84,13 +91,21 @@
                         <ColumnDefinition Width="42"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <Border Grid.Column="1" Background="#1A1A1A" CornerRadius="1.5"
-                            Height="4" ClipToBounds="True"
+                    <Border Grid.Column="1" Background="#1A1A1A" CornerRadius="3"
+                            Height="12" ClipToBounds="True"
                             x:Name="FiveHourTimerTrack"
                             ToolTip="5-Hour reset timer">
-                        <Border x:Name="FiveHourTimerFill" Background="#CC3333"
-                                CornerRadius="1.5" HorizontalAlignment="Left"
-                                Width="0" Opacity="0.85"/>
+                        <Grid>
+                            <Border x:Name="FiveHourTimerFill" Background="#CC3333"
+                                    CornerRadius="3" HorizontalAlignment="Left"
+                                    Width="0" Opacity="0.85"/>
+                            <TextBlock x:Name="FiveHourTimerText" Text=""
+                                       Foreground="#CCFFFFFF" FontSize="9.5" FontWeight="SemiBold"
+                                       FontFamily="Segoe UI"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       IsHitTestVisible="False"
+                                       Effect="{StaticResource BarTextShadow}"/>
+                        </Grid>
                     </Border>
                 </Grid>
 
@@ -130,13 +145,21 @@
                         <ColumnDefinition Width="42"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <Border Grid.Column="1" Background="#1A1A1A" CornerRadius="1.5"
-                            Height="4" ClipToBounds="True"
+                    <Border Grid.Column="1" Background="#1A1A1A" CornerRadius="3"
+                            Height="12" ClipToBounds="True"
                             x:Name="SevenDayTimerTrack"
                             ToolTip="7-Day reset timer">
-                        <Border x:Name="SevenDayTimerFill" Background="#CC3333"
-                                CornerRadius="1.5" HorizontalAlignment="Left"
-                                Width="0" Opacity="0.85"/>
+                        <Grid>
+                            <Border x:Name="SevenDayTimerFill" Background="#CC3333"
+                                    CornerRadius="3" HorizontalAlignment="Left"
+                                    Width="0" Opacity="0.85"/>
+                            <TextBlock x:Name="SevenDayTimerText" Text=""
+                                       Foreground="#CCFFFFFF" FontSize="9.5" FontWeight="SemiBold"
+                                       FontFamily="Segoe UI"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       IsHitTestVisible="False"
+                                       Effect="{StaticResource BarTextShadow}"/>
+                        </Grid>
                     </Border>
                 </Grid>
             </Grid>
