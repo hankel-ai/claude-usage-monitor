@@ -1,4 +1,5 @@
 @echo off
+set SCRIPTDIR=%~dp0
 set DOTNET=%LOCALAPPDATA%\dotnet\dotnet.exe
 set DEST=C:\Users\admin\OneDrive\ClaudeUsageMonitor.exe
 
@@ -8,7 +9,7 @@ if not exist "%DOTNET%" (
 )
 
 echo === Building single-file EXE ===
-"%DOTNET%" publish -c Release --no-restore 2>nul || "%DOTNET%" publish -c Release
+"%DOTNET%" publish "%SCRIPTDIR%ClaudeUsageMonitor.csproj" -c Release --no-restore 2>nul || "%DOTNET%" publish "%SCRIPTDIR%ClaudeUsageMonitor.csproj" -c Release
 if errorlevel 1 (
     echo BUILD FAILED
     exit /b 1
@@ -19,7 +20,7 @@ taskkill /f /im ClaudeUsageMonitor.exe >nul 2>&1
 timeout /t 1 /nobreak >nul
 
 echo === Copying to %DEST% ===
-copy /y "bin\Release\net8.0-windows\win-x64\publish\ClaudeUsageMonitor.exe" "%DEST%"
+copy /y "%SCRIPTDIR%bin\Release\net8.0-windows\win-x64\publish\ClaudeUsageMonitor.exe" "%DEST%"
 if errorlevel 1 (
     echo COPY FAILED
     exit /b 1
