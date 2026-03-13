@@ -3,6 +3,7 @@ using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Text.Json;
+using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 using ClaudeUsageMonitor.Models;
@@ -18,6 +19,11 @@ public class ClaudeApiService : IDisposable
     private HttpClient? _httpClient;
     private Timer? _timer;
     private UsageData? _lastSuccessfulUsage;
+    private readonly Random _random = new();
+    private int _pollIntervalSeconds = 120;
+    private int _consecutiveThrottleCount;
+    private DateTime _backoffUntilUtc = DateTime.MinValue;
+    private int _pollInProgress;
 
     public event Action<UsageData>? UsageUpdated;
     public event Action<string>? ErrorOccurred;
@@ -55,17 +61,57 @@ public class ClaudeApiService : IDisposable
     public void StartPolling(int intervalSeconds)
     {
         StopPolling();
+
+        _pollIntervalSeconds = Math.Max(30, intervalSeconds);
+        _consecutiveThrottleCount = 0;
+        _backoffUntilUtc = DateTime.MinValue;
+
         _timer = new Timer(
-            async _ => await PollUsageAsync(),
+            async _ => await PollAndRescheduleAsync(),
             null,
             TimeSpan.Zero,
-            TimeSpan.FromSeconds(intervalSeconds));
+            Timeout.InfiniteTimeSpan);
     }
 
     public void StopPolling()
     {
         _timer?.Dispose();
         _timer = null;
+    }
+
+    private async Task PollAndRescheduleAsync()
+    {
+        // Ensure one in-flight poll at a time even if previous request is slow.
+        if (Interlocked.Exchange(ref _pollInProgress, 1) == 1)
+            return;
+
+        try
+        {
+            await PollUsageAsync();
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _pollInProgress, 0);
+            RescheduleNextPoll();
+        }
+    }
+
+    private void RescheduleNextPoll()
+    {
+        var timer = _timer;
+        if (timer == null) return;
+
+        var nextDelay = TimeSpan.FromSeconds(_pollIntervalSeconds);
+        var now = DateTime.UtcNow;
+
+        if (_backoffUntilUtc > now)
+        {
+            var backoffDelay = _backoffUntilUtc - now;
+            if (backoffDelay > nextDelay)
+                nextDelay = backoffDelay;
+        }
+
+        timer.Change(nextDelay, Timeout.InfiniteTimeSpan);
     }
 
     public async Task PollUsageAsync()
@@ -101,6 +147,7 @@ public class ClaudeApiService : IDisposable
 
             if (response.StatusCode == HttpStatusCode.TooManyRequests)
             {
+                ApplyThrottleBackoff(response);
                 Log("WARN  Rate limited (429) — keeping last known data");
                 // Keep showing last known data instead of clearing bars
                 if (_lastSuccessfulUsage != null)
@@ -110,6 +157,9 @@ public class ClaudeApiService : IDisposable
 
             response.EnsureSuccessStatusCode();
 
+            _consecutiveThrottleCount = 0;
+            _backoffUntilUtc = DateTime.MinValue;
+
             var json = await response.Content.ReadAsStringAsync();
             var usage = ParseUsageResponse(json);
             _lastSuccessfulUsage = usage;
@@ -118,11 +168,13 @@ public class ClaudeApiService : IDisposable
         }
         catch (TaskCanceledException)
         {
+            ApplyTransientErrorBackoff();
             Log("ERROR Request timed out");
             ErrorOccurred?.Invoke("Request timed out");
         }
         catch (HttpRequestException ex)
         {
+            ApplyTransientErrorBackoff();
             Log($"ERROR Network: {ex.Message}");
             ErrorOccurred?.Invoke($"Network error: {ex.Message}");
         }
@@ -131,6 +183,48 @@ public class ClaudeApiService : IDisposable
             Log($"ERROR {ex.Message}");
             ErrorOccurred?.Invoke($"Error: {ex.Message}");
         }
+    }
+
+    private void ApplyTransientErrorBackoff()
+    {
+        // Short backoff on transient failures to avoid synchronized retries.
+        var jitterSeconds = _random.Next(5, 16);
+        var transientDelay = TimeSpan.FromSeconds(Math.Min(90, _pollIntervalSeconds + jitterSeconds));
+        var candidate = DateTime.UtcNow.Add(transientDelay);
+
+        if (candidate > _backoffUntilUtc)
+            _backoffUntilUtc = candidate;
+    }
+
+    private void ApplyThrottleBackoff(HttpResponseMessage response)
+    {
+        _consecutiveThrottleCount++;
+
+        var retryAfter = response.Headers.RetryAfter;
+        TimeSpan delay;
+
+        if (retryAfter?.Delta != null)
+        {
+            delay = retryAfter.Delta.Value;
+        }
+        else if (retryAfter?.Date != null)
+        {
+            delay = retryAfter.Date.Value.UtcDateTime - DateTime.UtcNow;
+            if (delay < TimeSpan.Zero)
+                delay = TimeSpan.Zero;
+        }
+        else
+        {
+            // Exponential fallback capped at 15 minutes plus a little jitter.
+            var exponent = Math.Min(_consecutiveThrottleCount, 5);
+            var baseSeconds = _pollIntervalSeconds * Math.Pow(2, exponent);
+            var cappedSeconds = Math.Min(baseSeconds, 900);
+            var jitterSeconds = _random.Next(3, 16);
+            delay = TimeSpan.FromSeconds(cappedSeconds + jitterSeconds);
+        }
+
+        _backoffUntilUtc = DateTime.UtcNow.Add(delay);
+        Log($"WARN  Backing off for {Math.Max(1, (int)delay.TotalSeconds)}s after 429");
     }
 
     private static UsageData ParseUsageResponse(string json)
@@ -151,7 +245,7 @@ public class ClaudeApiService : IDisposable
             if (fiveHour.TryGetProperty("resets_at", out var resets))
             {
                 if (DateTime.TryParse(resets.GetString(), null,
-                    System.Globalization.DateTimeStyles.RoundtripKind, out var dt))
+                    DateTimeStyles.RoundtripKind, out var dt))
                     usage.FiveHourResetsAt = dt.ToUniversalTime();
             }
         }
@@ -163,7 +257,7 @@ public class ClaudeApiService : IDisposable
             if (sevenDay.TryGetProperty("resets_at", out var resets))
             {
                 if (DateTime.TryParse(resets.GetString(), null,
-                    System.Globalization.DateTimeStyles.RoundtripKind, out var dt))
+                    DateTimeStyles.RoundtripKind, out var dt))
                     usage.SevenDayResetsAt = dt.ToUniversalTime();
             }
         }
