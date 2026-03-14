@@ -25,6 +25,9 @@ public class ClaudeApiService : IDisposable
     private DateTime _backoffUntilUtc = DateTime.MinValue;
     private int _pollInProgress;
 
+    /// <summary>The token value that most recently resulted in a 401/403 response.</summary>
+    public string? LastFailedToken { get; private set; }
+
     public event Action<UsageData>? UsageUpdated;
     public event Action<string>? ErrorOccurred;
     public event Action? AuthExpired;
@@ -139,9 +142,10 @@ public class ClaudeApiService : IDisposable
             if (response.StatusCode == HttpStatusCode.Unauthorized ||
                 response.StatusCode == HttpStatusCode.Forbidden)
             {
+                LastFailedToken = token;
                 Log("WARN  Auth expired or forbidden");
                 AuthExpired?.Invoke();
-                ErrorOccurred?.Invoke("Token expired - re-login via Claude Code");
+                ErrorOccurred?.Invoke("Token expired - waiting for refresh...");
                 return;
             }
 

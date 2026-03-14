@@ -103,6 +103,27 @@ public static class AppSettingsService
 
     public static bool HasCredentials => !string.IsNullOrEmpty(GetOAuthToken());
 
+    /// <summary>
+    /// Reads the token expiry from claudeAiOauth.expiresAt (Unix milliseconds).
+    /// Returns null if the field is absent or the file can't be read.
+    /// </summary>
+    public static DateTime? GetTokenExpiresAt()
+    {
+        try
+        {
+            if (!File.Exists(ClaudeCredentialsPath)) return null;
+            var json = File.ReadAllText(ClaudeCredentialsPath);
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.TryGetProperty("claudeAiOauth", out var oauth) &&
+                oauth.TryGetProperty("expiresAt", out var exp))
+            {
+                return DateTimeOffset.FromUnixTimeMilliseconds(exp.GetInt64()).UtcDateTime;
+            }
+            return null;
+        }
+        catch { return null; }
+    }
+
     public static string CredentialsFilePath => ClaudeCredentialsPath;
 
     // --- Launch on Startup (HKCU registry, no admin needed) ---

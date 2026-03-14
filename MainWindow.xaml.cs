@@ -1,5 +1,7 @@
 using System;
 using System.Diagnostics;
+using System.Text;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Controls;
@@ -20,7 +22,16 @@ public partial class MainWindow : Window
     private static readonly double BaseContentHeight = 80;
 
     private readonly ClaudeApiService _apiService;
-    private bool _isPaused;
+    private DispatcherTimer? _localTimer;
+
+    // Pause state — any true flag suppresses polling
+    private bool _isPaused;       // user-initiated via menu
+    private bool _fiveHourMaxed;  // 5-hour meter hit 100%
+    private bool _sevenDayMaxed;  // 7-day meter hit 100%
+    private bool _authExpired;    // received 401; waiting for token refresh
+
+    private bool ShouldBePaused => _isPaused || _fiveHourMaxed || _sevenDayMaxed || _authExpired;
+
     private bool _showResetTimers = true;
     private UsageData _lastUsage = new();
     private double _prevFiveHour;
@@ -66,6 +77,10 @@ public partial class MainWindow : Window
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
+        _localTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+        _localTimer.Tick += OnLocalTimerTick;
+        _localTimer.Start();
+
         if (AppSettingsService.HasCredentials)
         {
             _apiService.StartPolling(AppSettingsService.Current.PollingIntervalSeconds);
@@ -119,6 +134,14 @@ public partial class MainWindow : Window
             FiveHourTrack.ToolTip = BuildTooltipWithDelta(usage.FiveHourTooltip, usage.FiveHourUtilization, _prevFiveHour);
             SevenDayTrack.ToolTip = BuildTooltipWithDelta(usage.SevenDayTooltip, usage.SevenDayUtilization, _prevSevenDay);
             UpdateTimerTooltips();
+
+            // Auto-pause if either meter just hit 100%
+            var prevFiveMaxed = _fiveHourMaxed;
+            var prevSevenMaxed = _sevenDayMaxed;
+            _fiveHourMaxed = usage.FiveHourUtilization >= 100;
+            _sevenDayMaxed = usage.SevenDayUtilization >= 100;
+            if ((_fiveHourMaxed && !prevFiveMaxed) || (_sevenDayMaxed && !prevSevenMaxed))
+                ApplyPauseState();
         });
     }
 
@@ -141,7 +164,12 @@ public partial class MainWindow : Window
 
     private void OnAuthExpired()
     {
-        Dispatcher.Invoke(() => _apiService.StopPolling());
+        Dispatcher.Invoke(() =>
+        {
+            _authExpired = true;
+            ShowStatus("Token expired\nWaiting for refresh...");
+            ApplyPauseState();
+        });
     }
 
     private void UpdateAllBars()
@@ -196,21 +224,12 @@ public partial class MainWindow : Window
 
     private void UpdateBarTexts()
     {
-        FiveHourBarText.Text = GetBarText(_lastUsage.FiveHourUtilization, _lastUsage.FiveHourResetsAt);
-        SevenDayBarText.Text = GetBarText(_lastUsage.SevenDayUtilization, _lastUsage.SevenDayResetsAt);
+        FiveHourBarText.Text = GetBarText(_lastUsage.FiveHourUtilization);
+        SevenDayBarText.Text = GetBarText(_lastUsage.SevenDayUtilization);
     }
 
-    private static string GetBarText(double utilization, DateTime? resetsAt)
-    {
-        if (utilization >= 100)
-        {
-            if (!resetsAt.HasValue) return "100%";
-            var remaining = resetsAt.Value - DateTime.UtcNow;
-            if (remaining.TotalSeconds <= 0) return "Resetting...";
-            return FormatTimeSpan(remaining);
-        }
-        return $"{utilization:F0}%";
-    }
+    private static string GetBarText(double utilization) =>
+        utilization >= 100 ? "100%" : $"{utilization:F0}%";
 
     private static double GetElapsedPercentage(DateTime? resetsAt, TimeSpan totalWindow)
     {
@@ -347,23 +366,118 @@ public partial class MainWindow : Window
     private void PausePolling_Click(object sender, RoutedEventArgs e)
     {
         _isPaused = PausePollingMenuItem.IsChecked;
-        if (_isPaused)
+        ApplyPauseState();
+    }
+
+    private void ApplyPauseState()
+    {
+        var paused = ShouldBePaused;
+        PausedOverlay.Visibility = paused ? Visibility.Visible : Visibility.Collapsed;
+        if (paused)
         {
             _apiService.StopPolling();
-            PausedOverlay.Visibility = Visibility.Visible;
         }
-        else
+        else if (AppSettingsService.HasCredentials)
         {
-            PausedOverlay.Visibility = Visibility.Collapsed;
-            ResumePolling();
+            _apiService.StopPolling();
+            _apiService.StartPolling(AppSettingsService.Current.PollingIntervalSeconds);
         }
     }
 
-    private void ResumePolling()
+    /// <summary>
+    /// Fires every 5 s: keeps timer bars ticking while paused, and checks whether
+    /// any auto-pause condition has resolved so polling can resume.
+    /// </summary>
+    private void OnLocalTimerTick(object? sender, EventArgs e)
     {
-        _apiService.StopPolling();
-        if (AppSettingsService.HasCredentials)
-            _apiService.StartPolling(AppSettingsService.Current.PollingIntervalSeconds);
+        if (_showResetTimers)
+            UpdateTimerBars();
+
+        var stateChanged = false;
+
+        // 5-hour meter reset
+        if (_fiveHourMaxed && _lastUsage.FiveHourResetsAt.HasValue &&
+            DateTime.UtcNow >= _lastUsage.FiveHourResetsAt.Value)
+        {
+            _fiveHourMaxed = false;
+            _lastUsage.FiveHourUtilization = 0;
+            stateChanged = true;
+        }
+
+        // 7-day meter reset
+        if (_sevenDayMaxed && _lastUsage.SevenDayResetsAt.HasValue &&
+            DateTime.UtcNow >= _lastUsage.SevenDayResetsAt.Value)
+        {
+            _sevenDayMaxed = false;
+            _lastUsage.SevenDayUtilization = 0;
+            stateChanged = true;
+        }
+
+        // Auth expiry: check if a new valid token has appeared on disk
+        if (_authExpired && IsNewTokenValid())
+        {
+            _authExpired = false;
+            ShowStatus(null);
+            stateChanged = true;
+        }
+
+        if (stateChanged)
+        {
+            UpdateAllBars();
+            UpdateBarTexts();
+            ApplyPauseState();
+        }
+    }
+
+    /// <summary>
+    /// Returns true when the on-disk token is different from the one that caused the 401
+    /// AND can be confirmed as not-yet-expired (via credentials file expiresAt or JWT decode).
+    /// </summary>
+    private bool IsNewTokenValid()
+    {
+        var token = AppSettingsService.GetOAuthToken();
+        if (string.IsNullOrEmpty(token)) return false;
+        if (token == _apiService.LastFailedToken) return false;
+
+        // 1. Prefer explicit expiresAt field in credentials JSON
+        var expiresAt = AppSettingsService.GetTokenExpiresAt();
+        if (expiresAt.HasValue)
+            return expiresAt.Value > DateTime.UtcNow.AddMinutes(1);
+
+        // 2. Try decoding as JWT (Bearer tokens with header.payload.signature)
+        if (TryDecodeJwtExpiry(token, out var jwtExpiry))
+            return jwtExpiry > DateTime.UtcNow.AddMinutes(1);
+
+        // 3. Token changed but we can't verify expiry — assume it's fresh
+        return true;
+    }
+
+    /// <summary>
+    /// Attempts to decode the JWT payload and extract the 'exp' Unix timestamp.
+    /// Returns false if the string is not a valid JWT or has no 'exp' claim.
+    /// </summary>
+    private static bool TryDecodeJwtExpiry(string token, out DateTime expiry)
+    {
+        expiry = default;
+        var parts = token.Split('.');
+        if (parts.Length != 3) return false;
+        try
+        {
+            var payload = parts[1];
+            // Re-pad to valid base64
+            payload = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=')
+                             .Replace('-', '+').Replace('_', '/');
+            var bytes = Convert.FromBase64String(payload);
+            var json = System.Text.Encoding.UTF8.GetString(bytes);
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.TryGetProperty("exp", out var exp))
+            {
+                expiry = DateTimeOffset.FromUnixTimeSeconds(exp.GetInt64()).UtcDateTime;
+                return true;
+            }
+            return false;
+        }
+        catch { return false; }
     }
 
     private void Settings_Click(object sender, RoutedEventArgs e)
@@ -371,15 +485,17 @@ public partial class MainWindow : Window
         var settingsWindow = new SettingsWindow { Owner = this };
         if (settingsWindow.ShowDialog() == true)
         {
-            if (!_isPaused)
-                ResumePolling();
+            // Clear auth-expired flag in case the user refreshed credentials externally
+            _authExpired = false;
+            ShowStatus(null);
+            ApplyPauseState();
         }
     }
 
     private void Refresh_Click(object sender, RoutedEventArgs e)
     {
-        if (!_isPaused)
-            ResumePolling();
+        if (!ShouldBePaused)
+            ApplyPauseState();
     }
 
     private void Exit_Click(object sender, RoutedEventArgs e)
@@ -429,6 +545,7 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        _localTimer?.Stop();
         _apiService.Dispose();
         base.OnClosed(e);
     }
