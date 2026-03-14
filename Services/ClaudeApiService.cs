@@ -18,6 +18,7 @@ public class ClaudeApiService : IDisposable
 
     private HttpClient? _httpClient;
     private Timer? _timer;
+    private volatile bool _stopped = true;  // guards against stale _timer reads across threads
     private UsageData? _lastSuccessfulUsage;
     private readonly Random _random = new();
     private int _pollIntervalSeconds = 120;
@@ -70,6 +71,7 @@ public class ClaudeApiService : IDisposable
         _pollIntervalSeconds = Math.Max(30, intervalSeconds);
         _consecutiveThrottleCount = 0;
         _backoffUntilUtc = DateTime.MinValue;
+        _stopped = false;   // must be cleared BEFORE creating the timer
 
         _timer = new Timer(
             async _ => await PollAndRescheduleAsync(),
@@ -80,12 +82,15 @@ public class ClaudeApiService : IDisposable
 
     public void StopPolling()
     {
+        _stopped = true;    // volatile write — visible to all threads immediately
         _timer?.Dispose();
         _timer = null;
     }
 
     private async Task PollAndRescheduleAsync()
     {
+        if (_stopped) return;
+
         // Ensure one in-flight poll at a time even if previous request is slow.
         if (Interlocked.Exchange(ref _pollInProgress, 1) == 1)
             return;
@@ -103,6 +108,8 @@ public class ClaudeApiService : IDisposable
 
     private void RescheduleNextPoll()
     {
+        if (_stopped) return;
+
         var timer = _timer;
         if (timer == null) return;
 
@@ -145,7 +152,8 @@ public class ClaudeApiService : IDisposable
                 response.StatusCode == HttpStatusCode.Forbidden)
             {
                 LastFailedToken = token;
-                Log("WARN  Auth expired or forbidden");
+                StopPolling();
+                Log("WARN  Auth expired or forbidden — stopped");
                 AuthExpired?.Invoke();
                 ErrorOccurred?.Invoke("Token expired - waiting for refresh...");
                 return;
@@ -154,9 +162,9 @@ public class ClaudeApiService : IDisposable
             if (response.StatusCode == HttpStatusCode.TooManyRequests)
             {
                 ApplyThrottleBackoff(response);
-                Log("WARN  Rate limited (429) — pausing");
-                RateLimited?.Invoke(_backoffUntilUtc);
                 StopPolling();
+                Log("WARN  Rate limited (429) — stopped");
+                RateLimited?.Invoke(_backoffUntilUtc);
                 return;
             }
 
