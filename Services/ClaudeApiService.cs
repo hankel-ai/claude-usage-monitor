@@ -154,10 +154,9 @@ public class ClaudeApiService : IDisposable
             if (response.StatusCode == HttpStatusCode.TooManyRequests)
             {
                 ApplyThrottleBackoff(response);
-                Log("WARN  Rate limited (429) — keeping last known data");
+                Log("WARN  Rate limited (429) — pausing");
                 RateLimited?.Invoke(_backoffUntilUtc);
-                if (_lastSuccessfulUsage != null)
-                    UsageUpdated?.Invoke(_lastSuccessfulUsage);
+                StopPolling();
                 return;
             }
 
