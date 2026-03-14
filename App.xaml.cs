@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using ClaudeUsageMonitor.Services;
@@ -13,6 +14,14 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        // Kill any existing instances so there is never more than one running.
+        var current = Process.GetCurrentProcess();
+        foreach (var proc in Process.GetProcessesByName(current.ProcessName))
+        {
+            if (proc.Id == current.Id) continue;
+            try { proc.Kill(); proc.WaitForExit(2000); } catch { }
+        }
+
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
             WriteCrashLog(args.ExceptionObject as Exception);
 
