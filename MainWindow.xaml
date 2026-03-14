@@ -172,7 +172,13 @@
 
             <!-- Paused dim overlay (renders on top of content) -->
             <Border x:Name="PausedOverlay" Background="#60000000" CornerRadius="8"
-                    Visibility="Collapsed" IsHitTestVisible="False"/>
+                    Visibility="Collapsed" IsHitTestVisible="False">
+                <TextBlock x:Name="PausedOverlayText"
+                           Foreground="White" FontSize="9" FontFamily="Segoe UI" FontWeight="SemiBold"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                           TextAlignment="Center" Visibility="Collapsed"
+                           Effect="{StaticResource BarTextShadow}"/>
+            </Border>
         </Grid>
     </Border>
 </Window>

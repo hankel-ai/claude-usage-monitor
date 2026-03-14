@@ -31,6 +31,8 @@ public class ClaudeApiService : IDisposable
     public event Action<UsageData>? UsageUpdated;
     public event Action<string>? ErrorOccurred;
     public event Action? AuthExpired;
+    /// <summary>Fired on 429 with the UTC time when the backoff window ends.</summary>
+    public event Action<DateTime>? RateLimited;
 
     private static void Log(string message)
     {
@@ -153,7 +155,7 @@ public class ClaudeApiService : IDisposable
             {
                 ApplyThrottleBackoff(response);
                 Log("WARN  Rate limited (429) — keeping last known data");
-                // Keep showing last known data instead of clearing bars
+                RateLimited?.Invoke(_backoffUntilUtc);
                 if (_lastSuccessfulUsage != null)
                     UsageUpdated?.Invoke(_lastSuccessfulUsage);
                 return;

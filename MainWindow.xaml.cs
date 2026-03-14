@@ -29,8 +29,11 @@ public partial class MainWindow : Window
     private bool _fiveHourMaxed;  // 5-hour meter hit 100%
     private bool _sevenDayMaxed;  // 7-day meter hit 100%
     private bool _authExpired;    // received 401; waiting for token refresh
+    private bool _rateLimited;    // received 429; waiting for backoff window
+    private DateTime _rateLimitedAt;    // local time the 429 was received (display)
+    private DateTime _rateLimitedUntil; // UTC time the backoff window ends (auto-resume)
 
-    private bool ShouldBePaused => _isPaused || _fiveHourMaxed || _sevenDayMaxed || _authExpired;
+    private bool ShouldBePaused => _isPaused || _fiveHourMaxed || _sevenDayMaxed || _authExpired || _rateLimited;
 
     private bool _showResetTimers = true;
     private UsageData _lastUsage = new();
@@ -66,6 +69,7 @@ public partial class MainWindow : Window
         _apiService.UsageUpdated += OnUsageUpdated;
         _apiService.ErrorOccurred += OnError;
         _apiService.AuthExpired += OnAuthExpired;
+        _apiService.RateLimited += OnRateLimited;
 
         FiveHourTrack.SizeChanged += (_, _) => UpdateAllBars();
         SevenDayTrack.SizeChanged += (_, _) => UpdateAllBars();
@@ -168,6 +172,17 @@ public partial class MainWindow : Window
         {
             _authExpired = true;
             ShowStatus("Token expired\nWaiting for refresh...");
+            ApplyPauseState();
+        });
+    }
+
+    private void OnRateLimited(DateTime backoffUntilUtc)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            _rateLimited = true;
+            _rateLimitedAt = DateTime.Now;
+            _rateLimitedUntil = backoffUntilUtc;
             ApplyPauseState();
         });
     }
@@ -373,6 +388,17 @@ public partial class MainWindow : Window
     {
         var paused = ShouldBePaused;
         PausedOverlay.Visibility = paused ? Visibility.Visible : Visibility.Collapsed;
+
+        if (_rateLimited)
+        {
+            PausedOverlayText.Text = $"429 Too Many Requests\n{_rateLimitedAt:M/d h:mm:ss tt}";
+            PausedOverlayText.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            PausedOverlayText.Visibility = Visibility.Collapsed;
+        }
+
         if (paused)
         {
             _apiService.StopPolling();
@@ -418,6 +444,13 @@ public partial class MainWindow : Window
         {
             _authExpired = false;
             ShowStatus(null);
+            stateChanged = true;
+        }
+
+        // 429 backoff window expired
+        if (_rateLimited && DateTime.UtcNow >= _rateLimitedUntil)
+        {
+            _rateLimited = false;
             stateChanged = true;
         }
 
