@@ -1,7 +1,7 @@
 @echo off
 set SCRIPTDIR=%~dp0
 set DOTNET=%LOCALAPPDATA%\dotnet\dotnet.exe
-set DEST=C:\Users\admin\OneDrive\ClaudeUsageMonitor.exe
+set DEST=C:\Users\admin\OneDrive\Programs\ClaudeUsageMonitor.exe
 
 if not exist "%DOTNET%" (
     echo ERROR: .NET 8 SDK not found at %DOTNET%
