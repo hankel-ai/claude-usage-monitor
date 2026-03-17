@@ -566,6 +566,8 @@ public partial class MainWindow : Window
             trayMenu.Items.Add("Exit", null, (_, _) =>
             {
                 _trayIcon.Visible = false;
+                _trayIcon.ContextMenuStrip?.Dispose();
+                _trayIcon.Dispose();
                 _apiService.Dispose();
                 Application.Current.Shutdown();
             });
@@ -664,9 +666,15 @@ public partial class MainWindow : Window
         if (_trayIcon != null)
         {
             _trayIcon.Visible = false;
+            _trayIcon.ContextMenuStrip?.Dispose();
             _trayIcon.Dispose();
         }
         _apiService.Dispose();
         base.OnClosed(e);
+
+        // Safety net: force-kill the process so stale threadpool work
+        // (e.g. in-flight HTTP continuations, WinForms interop windows)
+        // cannot keep the process alive.
+        Environment.Exit(0);
     }
 }

@@ -19,6 +19,7 @@ public class ClaudeApiService : IDisposable
     private HttpClient? _httpClient;
     private Timer? _timer;
     private volatile bool _stopped = true;  // guards against stale _timer reads across threads
+    private CancellationTokenSource? _cts;
     private UsageData? _lastSuccessfulUsage;
     private readonly Random _random = new();
     private int _pollIntervalSeconds = 120;
@@ -72,6 +73,7 @@ public class ClaudeApiService : IDisposable
         _consecutiveThrottleCount = 0;
         _backoffUntilUtc = DateTime.MinValue;
         _stopped = false;   // must be cleared BEFORE creating the timer
+        _cts = new CancellationTokenSource();
 
         _timer = new Timer(
             async _ => await PollAndRescheduleAsync(),
@@ -83,6 +85,7 @@ public class ClaudeApiService : IDisposable
     public void StopPolling()
     {
         _stopped = true;    // volatile write — visible to all threads immediately
+        _cts?.Cancel();
         _timer?.Dispose();
         _timer = null;
     }
@@ -145,7 +148,7 @@ public class ClaudeApiService : IDisposable
             request.Headers.Add("Authorization", $"Bearer {token}");
             request.Headers.Add("anthropic-beta", "oauth-2025-04-20");
 
-            var response = await _httpClient!.SendAsync(request);
+            var response = await _httpClient!.SendAsync(request, _cts?.Token ?? CancellationToken.None);
             Log($"INFO  Response: {(int)response.StatusCode} {response.StatusCode}");
 
             if (response.StatusCode == HttpStatusCode.Unauthorized ||
@@ -173,7 +176,7 @@ public class ClaudeApiService : IDisposable
             _consecutiveThrottleCount = 0;
             _backoffUntilUtc = DateTime.MinValue;
 
-            var json = await response.Content.ReadAsStringAsync();
+            var json = await response.Content.ReadAsStringAsync((_cts?.Token ?? CancellationToken.None));
             var usage = ParseUsageResponse(json);
             _lastSuccessfulUsage = usage;
             Log($"OK    5h={usage.FiveHourUtilization:F1}%  7d={usage.SevenDayUtilization:F1}%");
@@ -282,5 +285,7 @@ public class ClaudeApiService : IDisposable
     {
         StopPolling();
         _httpClient?.Dispose();
+        _cts?.Dispose();
+        _cts = null;
     }
 }
