@@ -10,6 +10,7 @@ using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using ClaudeUsageMonitor.Models;
 using ClaudeUsageMonitor.Services;
+using WinForms = System.Windows.Forms;
 
 namespace ClaudeUsageMonitor;
 
@@ -42,6 +43,9 @@ public partial class MainWindow : Window
     private bool _hasReceivedData;
     private bool _suppressZoom;
     private DispatcherTimer? _hoverDelayTimer;
+    private WinForms.NotifyIcon? _trayIcon;
+    private bool _isZoomed;
+    private bool _tooltipsEnabled;
 
     public MainWindow()
     {
@@ -381,12 +385,22 @@ public partial class MainWindow : Window
     private void PausePolling_Click(object sender, RoutedEventArgs e)
     {
         _isPaused = PausePollingMenuItem.IsChecked;
+        if (!_isPaused)
+        {
+            // User unchecked — clear all auto-pause flags so polling resumes
+            _fiveHourMaxed = false;
+            _sevenDayMaxed = false;
+            _authExpired = false;
+            _rateLimited = false;
+            ShowStatus(null);
+        }
         ApplyPauseState();
     }
 
     private void ApplyPauseState()
     {
         var paused = ShouldBePaused;
+        PausePollingMenuItem.IsChecked = paused;
         PausedOverlay.Visibility = paused ? Visibility.Visible : Visibility.Collapsed;
 
         if (_rateLimited)
@@ -531,19 +545,76 @@ public partial class MainWindow : Window
             ApplyPauseState();
     }
 
+    private void MinimizeToTray_Click(object sender, RoutedEventArgs e)
+    {
+        if (_trayIcon == null)
+        {
+            _trayIcon = new WinForms.NotifyIcon();
+            // Use the application icon from the exe, fall back to a system icon
+            var exePath = Environment.ProcessPath;
+            if (exePath != null)
+            {
+                var icon = System.Drawing.Icon.ExtractAssociatedIcon(exePath);
+                if (icon != null) _trayIcon.Icon = icon;
+            }
+            _trayIcon.Icon ??= System.Drawing.SystemIcons.Application;
+            _trayIcon.Text = "Claude Usage Monitor";
+            _trayIcon.DoubleClick += (_, _) => RestoreFromTray();
+
+            var trayMenu = new WinForms.ContextMenuStrip();
+            trayMenu.Items.Add("Restore", null, (_, _) => RestoreFromTray());
+            trayMenu.Items.Add("Exit", null, (_, _) =>
+            {
+                _trayIcon.Visible = false;
+                _apiService.Dispose();
+                Application.Current.Shutdown();
+            });
+            _trayIcon.ContextMenuStrip = trayMenu;
+        }
+
+        _trayIcon.Visible = true;
+        Hide();
+    }
+
+    private void RestoreFromTray()
+    {
+        Show();
+        if (_trayIcon != null)
+        {
+            _trayIcon.Visible = false;
+        }
+    }
+
     private void Exit_Click(object sender, RoutedEventArgs e)
     {
+        if (_trayIcon != null)
+        {
+            _trayIcon.Visible = false;
+            _trayIcon.Dispose();
+        }
         _apiService.Dispose();
         Application.Current.Shutdown();
     }
 
+    private void SetTooltipsEnabled(bool enabled)
+    {
+        _tooltipsEnabled = enabled;
+        ToolTipService.SetIsEnabled(FiveHourTrack, enabled);
+        ToolTipService.SetIsEnabled(SevenDayTrack, enabled);
+        ToolTipService.SetIsEnabled(FiveHourTimerTrack, enabled);
+        ToolTipService.SetIsEnabled(SevenDayTimerTrack, enabled);
+    }
+
     private void OuterBorder_MouseEnter(object sender, MouseEventArgs e)
     {
+        _isZoomed = false;
+        SetTooltipsEnabled(false);
         if (_suppressZoom) return;
         var delayMs = AppSettingsService.Current.HoverZoomDelayMs;
         if (delayMs <= 0)
         {
             AnimateScale(1.5, 150);
+            _isZoomed = true;
             return;
         }
         _hoverDelayTimer?.Stop();
@@ -552,7 +623,10 @@ public partial class MainWindow : Window
         {
             _hoverDelayTimer.Stop();
             if (!_suppressZoom)
+            {
                 AnimateScale(1.5, 150);
+                _isZoomed = true;
+            }
         };
         _hoverDelayTimer.Start();
     }
@@ -561,7 +635,15 @@ public partial class MainWindow : Window
     {
         _hoverDelayTimer?.Stop();
         _suppressZoom = false;
+        _isZoomed = false;
+        SetTooltipsEnabled(false);
         AnimateScale(1.0, 150);
+    }
+
+    private void OuterBorder_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (_isZoomed && !_tooltipsEnabled)
+            SetTooltipsEnabled(true);
     }
 
     private void AnimateScale(double targetScale, int durationMs)
@@ -579,6 +661,11 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _localTimer?.Stop();
+        if (_trayIcon != null)
+        {
+            _trayIcon.Visible = false;
+            _trayIcon.Dispose();
+        }
         _apiService.Dispose();
         base.OnClosed(e);
     }
