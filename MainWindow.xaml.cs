@@ -46,6 +46,8 @@ public partial class MainWindow : Window
     private WinForms.NotifyIcon? _trayIcon;
     private bool _isZoomed;
     private bool _tooltipsEnabled;
+    private DateTime _lastClickTime;
+    private DispatcherTimer? _singleClickTimer;
 
     public MainWindow()
     {
@@ -361,8 +363,30 @@ public partial class MainWindow : Window
 
         if (Math.Abs(Left - startLeft) < 2 && Math.Abs(Top - startTop) < 2)
         {
-            // Click without drag — open usage page
-            Process.Start(new ProcessStartInfo("https://claude.ai/settings/usage") { UseShellExecute = true });
+            var now = DateTime.UtcNow;
+            var doubleClickThreshold = TimeSpan.FromMilliseconds(
+                System.Windows.Forms.SystemInformation.DoubleClickTime);
+
+            if (now - _lastClickTime < doubleClickThreshold)
+            {
+                // Double-click — minimize to tray
+                _singleClickTimer?.Stop();
+                _lastClickTime = DateTime.MinValue;
+                MinimizeToTray_Click(sender, e);
+                return;
+            }
+
+            _lastClickTime = now;
+
+            // Delay single-click action to distinguish from double-click
+            _singleClickTimer?.Stop();
+            _singleClickTimer = new DispatcherTimer { Interval = doubleClickThreshold };
+            _singleClickTimer.Tick += (_, _) =>
+            {
+                _singleClickTimer.Stop();
+                Process.Start(new ProcessStartInfo("https://claude.ai/settings/usage") { UseShellExecute = true });
+            };
+            _singleClickTimer.Start();
             return;
         }
         AppSettingsService.Current.WindowLeft = Left;
