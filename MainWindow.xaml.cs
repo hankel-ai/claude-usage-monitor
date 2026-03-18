@@ -559,7 +559,7 @@ public partial class MainWindow : Window
             }
             _trayIcon.Icon ??= System.Drawing.SystemIcons.Application;
             _trayIcon.Text = "Claude Usage Monitor";
-            _trayIcon.DoubleClick += (_, _) => RestoreFromTray();
+            _trayIcon.Click += (_, _) => RestoreFromTray();
 
             var trayMenu = new WinForms.ContextMenuStrip();
             trayMenu.Items.Add("Restore", null, (_, _) => RestoreFromTray());
