@@ -572,7 +572,7 @@ public partial class MainWindow : Window
     private void ViewLog_Click(object sender, RoutedEventArgs e)
     {
         var logPath = System.IO.Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "ClaudeUsageMonitor", "log.txt");
         if (System.IO.File.Exists(logPath))
             Process.Start(new ProcessStartInfo(logPath) { UseShellExecute = true });
