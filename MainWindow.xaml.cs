@@ -11,6 +11,7 @@ using System.Windows.Threading;
 using ClaudeUsageMonitor.Models;
 using ClaudeUsageMonitor.Services;
 using WinForms = System.Windows.Forms;
+using Drawing = System.Drawing;
 
 namespace ClaudeUsageMonitor;
 
@@ -152,6 +153,8 @@ public partial class MainWindow : Window
             _sevenDayMaxed = usage.SevenDayUtilization >= 100;
             if ((_fiveHourMaxed && !prevFiveMaxed) || (_sevenDayMaxed && !prevSevenMaxed))
                 ApplyPauseState();
+
+            UpdateTrayIcon();
         });
     }
 
@@ -457,6 +460,8 @@ public partial class MainWindow : Window
         if (_showResetTimers)
             UpdateTimerBars();
 
+        UpdateTrayIcon();
+
         var stateChanged = false;
 
         // 5-hour meter reset
@@ -618,6 +623,76 @@ public partial class MainWindow : Window
         {
             _trayIcon.Visible = false;
         }
+    }
+
+    private void UpdateTrayIcon()
+    {
+        if (_trayIcon == null || !_trayIcon.Visible) return;
+
+        const int size = 16;
+        const int barWidth = 6;
+        const int gap = 2;
+        const int leftX = 1;
+        const int rightX = leftX + barWidth + gap;
+        const int barTop = 1;
+        const int barBottom = 14; // leaves 1px padding top and bottom
+        int barHeight = barBottom - barTop;
+
+        using var bmp = new Drawing.Bitmap(size, size);
+        using var g = Drawing.Graphics.FromImage(bmp);
+        g.Clear(Drawing.Color.Transparent);
+
+        // Draw background tracks
+        var trackColor = Drawing.Color.FromArgb(180, 42, 42, 42);
+        using (var trackBrush = new Drawing.SolidBrush(trackColor))
+        {
+            g.FillRectangle(trackBrush, leftX, barTop, barWidth, barHeight);
+            g.FillRectangle(trackBrush, rightX, barTop, barWidth, barHeight);
+        }
+
+        // Left bar: 5-hour usage (fills bottom to top)
+        var usagePct = Math.Clamp(_lastUsage.FiveHourUtilization, 0, 100) / 100.0;
+        int usageFillH = (int)(barHeight * usagePct);
+        if (usageFillH > 0)
+        {
+            var usageColor = _lastUsage.FiveHourUtilization >= 90
+                ? Drawing.Color.FromArgb(244, 67, 54)    // red
+                : _lastUsage.FiveHourUtilization >= 70
+                    ? Drawing.Color.FromArgb(255, 152, 0) // orange
+                    : Drawing.Color.FromArgb(76, 175, 80); // green
+            using var brush = new Drawing.SolidBrush(usageColor);
+            g.FillRectangle(brush, leftX, barBottom - usageFillH, barWidth, usageFillH);
+        }
+
+        // Right bar: 5-hour reset timer (fills bottom to top)
+        var timerPct = GetElapsedPercentage(_lastUsage.FiveHourResetsAt, FiveHourWindow) / 100.0;
+        int timerFillH = (int)(barHeight * timerPct);
+        if (timerFillH > 0)
+        {
+            var timerColor = Drawing.Color.FromArgb(204, 51, 51); // #CC3333
+            using var brush = new Drawing.SolidBrush(timerColor);
+            g.FillRectangle(brush, rightX, barBottom - timerFillH, barWidth, timerFillH);
+        }
+
+        var oldIcon = _trayIcon.Icon;
+        _trayIcon.Icon = Drawing.Icon.FromHandle(bmp.GetHicon());
+        if (oldIcon != null) NativeMethods.DestroyIcon(oldIcon.Handle);
+
+        // Update tooltip with current stats
+        var tip = $"5h: {_lastUsage.FiveHourUtilization:F0}%";
+        if (_lastUsage.FiveHourResetsAt.HasValue)
+        {
+            var remaining = _lastUsage.FiveHourResetsAt.Value - DateTime.UtcNow;
+            if (remaining.TotalSeconds > 0)
+                tip += $" | resets in {FormatTimeSpan(remaining)}";
+        }
+        _trayIcon.Text = tip;
+    }
+
+    private static class NativeMethods
+    {
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        public static extern bool DestroyIcon(IntPtr handle);
     }
 
     private void Exit_Click(object sender, RoutedEventArgs e)
