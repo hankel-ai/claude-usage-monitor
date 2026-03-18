@@ -569,6 +569,15 @@ public partial class MainWindow : Window
             ApplyPauseState();
     }
 
+    private void ViewLog_Click(object sender, RoutedEventArgs e)
+    {
+        var logPath = System.IO.Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "ClaudeUsageMonitor", "log.txt");
+        if (System.IO.File.Exists(logPath))
+            Process.Start(new ProcessStartInfo(logPath) { UseShellExecute = true });
+    }
+
     private void MinimizeToTray_Click(object sender, RoutedEventArgs e)
     {
         if (_trayIcon == null)

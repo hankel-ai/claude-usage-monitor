@@ -26,6 +26,7 @@
             <MenuItem Header="Settings..." Click="Settings_Click"/>
             <MenuItem Header="Refresh Now" Click="Refresh_Click"/>
             <MenuItem Header="Minimize to Tray" Click="MinimizeToTray_Click"/>
+            <MenuItem Header="View Log" Click="ViewLog_Click"/>
             <Separator/>
             <MenuItem Header="Exit" Click="Exit_Click"/>
         </ContextMenu>
