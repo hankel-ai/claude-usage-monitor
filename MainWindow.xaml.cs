@@ -58,14 +58,15 @@ public partial class MainWindow : Window
         Topmost = settings.AlwaysOnTop;
         AlwaysOnTopMenuItem.IsChecked = settings.AlwaysOnTop;
 
-        if (settings.WindowLeft >= 0 && settings.WindowTop >= 0)
+        var area = SystemParameters.WorkArea;
+        if (settings.WindowLeft >= 0 && settings.WindowTop >= 0 &&
+            settings.WindowLeft < area.Right - 20 && settings.WindowTop < area.Bottom - 20)
         {
             Left = settings.WindowLeft;
             Top = settings.WindowTop;
         }
         else
         {
-            var area = SystemParameters.WorkArea;
             var padX = (Width - BaseContentWidth) / 2;
             var padY = (Height - BaseContentHeight) / 2;
             Left = area.Right - BaseContentWidth - 10 - padX;
