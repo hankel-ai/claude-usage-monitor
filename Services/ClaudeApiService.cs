@@ -70,15 +70,22 @@ public class ClaudeApiService : IDisposable
         StopPolling();
 
         _pollIntervalSeconds = Math.Max(30, intervalSeconds);
-        _consecutiveThrottleCount = 0;
-        _backoffUntilUtc = DateTime.MinValue;
+        // NOTE: Do NOT reset _consecutiveThrottleCount or _backoffUntilUtc here.
+        // They are reset on a successful response (see PollUsageAsync).
+        // Resetting here defeats exponential backoff when auto-resuming after 429.
         _stopped = false;   // must be cleared BEFORE creating the timer
         _cts = new CancellationTokenSource();
+
+        // If a backoff window is still active, honour it instead of polling immediately.
+        var initialDelay = TimeSpan.Zero;
+        var remaining = _backoffUntilUtc - DateTime.UtcNow;
+        if (remaining > TimeSpan.Zero)
+            initialDelay = remaining;
 
         _timer = new Timer(
             async _ => await PollAndRescheduleAsync(),
             null,
-            TimeSpan.Zero,
+            initialDelay,
             Timeout.InfiniteTimeSpan);
     }
 
