@@ -460,6 +460,8 @@ public partial class MainWindow : Window
         if (_showResetTimers)
             UpdateTimerBars();
 
+        UpdateTrayIcon();
+
         var stateChanged = false;
 
         // 5-hour meter reset
@@ -611,6 +613,7 @@ public partial class MainWindow : Window
         }
 
         _trayIcon.Visible = true;
+        UpdateTrayIcon();
         Hide();
     }
 
