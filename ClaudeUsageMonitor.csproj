@@ -17,4 +17,10 @@
 
   <!-- No external NuGet packages needed -->
 
+  <!-- The standalone test project under tests/ links production sources directly;
+       keep its files out of the WPF app's default compilation. -->
+  <ItemGroup>
+    <Compile Remove="tests\**\*.cs" />
+  </ItemGroup>
+
 </Project>

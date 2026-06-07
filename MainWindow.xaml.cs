@@ -307,6 +307,9 @@ public partial class MainWindow : Window
     {
         if (trackWidth <= 0) return;
         var clamped = Math.Clamp(percentage, 0, 100);
+        // Reverse coloring: red just after a reset (little elapsed), green as the
+        // window is almost up — the mirror of the 5-hour usage bar.
+        fill.Background = ToMediaBrush(BarColorMap.ResetTimerColor(clamped));
         var animation = new DoubleAnimation
         {
             To = trackWidth * (clamped / 100.0),
@@ -315,6 +318,9 @@ public partial class MainWindow : Window
         };
         fill.BeginAnimation(WidthProperty, animation);
     }
+
+    private static SolidColorBrush ToMediaBrush((byte R, byte G, byte B) c)
+        => new SolidColorBrush(Color.FromRgb(c.R, c.G, c.B));
 
     private static Brush GetMeterBrush(double percentage, bool isFiveHour)
     {
@@ -666,12 +672,15 @@ public partial class MainWindow : Window
             g.FillRectangle(brush, leftX, barBottom - usageFillH, barWidth, usageFillH);
         }
 
-        // Right bar: 5-hour reset timer (fills bottom to top)
-        var timerPct = GetElapsedPercentage(_lastUsage.FiveHourResetsAt, FiveHourWindow) / 100.0;
-        int timerFillH = (int)(barHeight * timerPct);
+        // Right bar: 5-hour reset timer (fills bottom to top).
+        // Reverse coloring: red just after a reset, green as the reset nears —
+        // mirrors the left usage bar.
+        var timerElapsed = GetElapsedPercentage(_lastUsage.FiveHourResetsAt, FiveHourWindow);
+        int timerFillH = (int)(barHeight * (timerElapsed / 100.0));
         if (timerFillH > 0)
         {
-            var timerColor = Drawing.Color.FromArgb(204, 51, 51); // #CC3333
+            var (tr, tg, tb) = BarColorMap.ResetTimerColor(timerElapsed);
+            var timerColor = Drawing.Color.FromArgb(tr, tg, tb);
             using var brush = new Drawing.SolidBrush(timerColor);
             g.FillRectangle(brush, rightX, barBottom - timerFillH, barWidth, timerFillH);
         }
