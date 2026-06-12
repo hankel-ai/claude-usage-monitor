@@ -32,16 +32,38 @@ public static class BarColorMap
     }
 
     /// <summary>
-    /// Reverse coloring for a reset-timer bar. <paramref name="elapsedPercentage"/>
+    /// Smooth gradient for a reset-timer bar. <paramref name="elapsedPercentage"/>
     /// is how much of the window has elapsed (0 = just reset, 100 = resetting
-    /// now). Returns red when little has elapsed and green as the reset nears —
-    /// the mirror image of <see cref="ThresholdColor"/>.
+    /// now). Interpolates red → orange → green across the full range so the
+    /// color change is visible throughout, not just in the first 30%.
     /// </summary>
     public static (byte R, byte G, byte B) ResetTimerColor(double elapsedPercentage)
     {
-        var clamped = elapsedPercentage < 0 ? 0
-            : elapsedPercentage > 100 ? 100
-            : elapsedPercentage;
-        return ThresholdColor(100 - clamped);
+        var t = elapsedPercentage < 0 ? 0
+            : elapsedPercentage > 100 ? 1.0
+            : elapsedPercentage / 100.0;
+
+        // Two-segment lerp: red → orange (0–0.5), orange → green (0.5–1.0)
+        if (t <= 0.5)
+        {
+            var s = t / 0.5;
+            return Lerp(Red, Orange, s);
+        }
+        else
+        {
+            var s = (t - 0.5) / 0.5;
+            return Lerp(Orange, Green, s);
+        }
+    }
+
+    private static (byte R, byte G, byte B) Lerp(
+        (byte R, byte G, byte B) a,
+        (byte R, byte G, byte B) b,
+        double t)
+    {
+        return (
+            (byte)(a.R + (b.R - a.R) * t),
+            (byte)(a.G + (b.G - a.G) * t),
+            (byte)(a.B + (b.B - a.B) * t));
     }
 }

@@ -21,19 +21,24 @@ Check(BarColorMap.ThresholdColor(89.9) == orange, "usage 89.9% -> orange");
 Check(BarColorMap.ThresholdColor(90) == red, "usage 90% -> red");
 Check(BarColorMap.ThresholdColor(100) == red, "usage 100% -> red");
 
-// --- Reset-timer reverse scheme (red just after reset -> green as reset nears) ---
+// --- Reset-timer smooth gradient (red -> orange -> green as elapsed increases) ---
 Check(BarColorMap.ResetTimerColor(0) == red, "timer 0% elapsed (just reset) -> red");
-Check(BarColorMap.ResetTimerColor(5) == red, "timer 5% elapsed -> red");
-Check(BarColorMap.ResetTimerColor(10) == red, "timer 10% elapsed -> red");
-Check(BarColorMap.ResetTimerColor(10.1) == orange, "timer 10.1% elapsed -> orange");
-Check(BarColorMap.ResetTimerColor(30) == orange, "timer 30% elapsed -> orange");
-Check(BarColorMap.ResetTimerColor(30.1) == green, "timer 30.1% elapsed -> green");
-Check(BarColorMap.ResetTimerColor(70) == green, "timer 70% elapsed -> green");
+Check(BarColorMap.ResetTimerColor(50) == orange, "timer 50% elapsed -> orange");
 Check(BarColorMap.ResetTimerColor(100) == green, "timer 100% elapsed (almost reset) -> green");
 
-// --- It is exactly the mirror of the usage scheme ---
-Check(BarColorMap.ResetTimerColor(40) == BarColorMap.ThresholdColor(60), "reverse symmetry at 40/60");
-Check(BarColorMap.ResetTimerColor(85) == BarColorMap.ThresholdColor(15), "reverse symmetry at 85/15");
+// Intermediate values should be between the endpoint colors
+var (r25, g25, _) = BarColorMap.ResetTimerColor(25);
+Check(r25 >= red.Item1 && r25 <= orange.Item1, "timer 25% R between red and orange");
+Check(g25 > red.Item2 && g25 < orange.Item2, "timer 25% G between red and orange");
+
+var (r75, g75, _) = BarColorMap.ResetTimerColor(75);
+Check(r75 < orange.Item1, "timer 75% R less than orange (heading toward green)");
+Check(g75 > orange.Item2, "timer 75% G greater than orange (heading toward green)");
+
+// Monotonic: green channel increases across the range
+var (_, g20, _) = BarColorMap.ResetTimerColor(20);
+var (_, g80, _) = BarColorMap.ResetTimerColor(80);
+Check(g20 < g80, "green channel increases over time");
 
 // --- Clamping out-of-range inputs ---
 Check(BarColorMap.ResetTimerColor(-10) == red, "timer clamps < 0 -> red");
