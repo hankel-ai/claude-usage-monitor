@@ -5,7 +5,7 @@
         AllowsTransparency="True"
         Background="Transparent"
         ResizeMode="NoResize"
-        Width="330" Height="120"
+        Width="350" Height="190"
         ShowInTaskbar="False"
         MouseLeftButtonDown="Window_MouseLeftButtonDown">
 
@@ -20,6 +20,8 @@
                       IsCheckable="True" IsChecked="True" Click="AlwaysOnTop_Click"/>
             <MenuItem x:Name="ShowResetTimersMenuItem" Header="Show Reset Timers"
                       IsCheckable="True" IsChecked="True" Click="ShowResetTimers_Click"/>
+            <MenuItem x:Name="ShowLiteLLMSpendMenuItem" Header="Show LiteLLM Spend"
+                      IsCheckable="True" IsChecked="True" Click="ShowLiteLLMSpend_Click"/>
             <MenuItem x:Name="PausePollingMenuItem" Header="Pause Polling"
                       IsCheckable="True" Click="PausePolling_Click"/>
             <Separator/>
@@ -56,6 +58,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="2"/>
                     <RowDefinition x:Name="SevenDayTimerRow" Height="Auto"/>
+                    <RowDefinition x:Name="SpendRow" Height="Auto"/>
                 </Grid.RowDefinitions>
 
                 <!-- 5-Hour Usage Meter -->
@@ -158,6 +161,33 @@
                                     Width="0" Opacity="0.85"/>
                             <TextBlock x:Name="SevenDayTimerText" Text=""
                                        Foreground="#CCFFFFFF" FontSize="9.5" FontWeight="SemiBold"
+                                       FontFamily="Segoe UI"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       IsHitTestVisible="False"
+                                       Effect="{StaticResource BarTextShadow}"/>
+                        </Grid>
+                    </Border>
+                </Grid>
+
+                <!-- LiteLLM Vertex Spend Meter -->
+                <Grid Grid.Row="7" x:Name="SpendPanel" Margin="0,6,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="42"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="SpendLabel" Text="API Spend" Foreground="#999" FontSize="8.5"
+                               FontFamily="Segoe UI" VerticalAlignment="Center"
+                               TextTrimming="None"/>
+                    <Border Grid.Column="1" Background="#2A2A2A" CornerRadius="3.5"
+                            Height="15" ClipToBounds="True"
+                            x:Name="SpendTrack" Cursor="Hand"
+                            MouseLeftButtonDown="SpendTrack_MouseLeftButtonDown"
+                            ToolTip="LiteLLM Spend: No data">
+                        <Grid>
+                            <Border x:Name="SpendFill" Background="#26A69A"
+                                    HorizontalAlignment="Left" Width="0"/>
+                            <TextBlock x:Name="SpendBarText" Text=""
+                                       Foreground="White" FontSize="9" FontWeight="SemiBold"
                                        FontFamily="Segoe UI"
                                        HorizontalAlignment="Center" VerticalAlignment="Center"
                                        IsHitTestVisible="False"

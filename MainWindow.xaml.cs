@@ -21,9 +21,12 @@ public partial class MainWindow : Window
     private static readonly TimeSpan SevenDayWindow = TimeSpan.FromDays(7);
 
     private static readonly double BaseContentWidth = 220;
-    private static readonly double BaseContentHeight = 80;
+    // Matches the tallest panel (both usage meters + reset timers + spend bar) so the
+    // default bottom-right anchor never tucks content under the taskbar. See UpdateWindowHeight().
+    private static readonly double BaseContentHeight = 101;
 
     private readonly ClaudeApiService _apiService;
+    private readonly LiteLLMSpendService _spendService;
     private DispatcherTimer? _localTimer;
 
     // Pause state — any true flag suppresses polling
@@ -38,6 +41,10 @@ public partial class MainWindow : Window
     private bool ShouldBePaused => _isPaused || _fiveHourMaxed || _sevenDayMaxed || _authExpired || _rateLimited;
 
     private bool _showResetTimers = true;
+    private bool _showSpend = true;
+    private SpendWindow _spendWindow = SpendWindow.MonthToDate;
+    private double _lastSpend;
+    private bool _hasSpendData;
     private UsageData _lastUsage = new();
     private double _prevFiveHour;
     private double _prevSevenDay;
@@ -79,10 +86,19 @@ public partial class MainWindow : Window
         _apiService.AuthExpired += OnAuthExpired;
         _apiService.RateLimited += OnRateLimited;
 
+        // LiteLLM Vertex spend meter
+        _showSpend = settings.ShowLiteLLMSpend;
+        _spendWindow = SpendWindowExtensions.Parse(settings.LiteLLMSpendWindow);
+        ShowLiteLLMSpendMenuItem.IsChecked = _showSpend;
+        _spendService = new LiteLLMSpendService { CurrentWindow = _spendWindow };
+        _spendService.SpendUpdated += OnSpendUpdated;
+        _spendService.SpendError += OnSpendError;
+
         FiveHourTrack.SizeChanged += (_, _) => UpdateAllBars();
         SevenDayTrack.SizeChanged += (_, _) => UpdateAllBars();
         FiveHourTimerTrack.SizeChanged += (_, _) => UpdateTimerBars();
         SevenDayTimerTrack.SizeChanged += (_, _) => UpdateTimerBars();
+        SpendTrack.SizeChanged += (_, _) => UpdateSpendBar();
 
         Loaded += OnLoaded;
     }
@@ -103,6 +119,9 @@ public partial class MainWindow : Window
             FiveHourTrack.ToolTip = "No Claude Code credentials found";
             SevenDayTrack.ToolTip = "Run 'claude' in a terminal and log in";
         }
+
+        // Spend meter is only shown/polled when a LiteLLM key is configured.
+        ApplySpendState();
     }
 
     private void ShowStatus(string? message)
@@ -346,8 +365,124 @@ public partial class MainWindow : Window
         var vis = visible ? Visibility.Visible : Visibility.Collapsed;
         FiveHourTimerPanel.Visibility = vis;
         SevenDayTimerPanel.Visibility = vis;
-        OuterBorder.Height = visible ? 80 : 68;
+        UpdateWindowHeight();
         if (visible) UpdateTimerBars();
+    }
+
+    /// <summary>
+    /// Sizes the widget frame to hug whichever sections are visible.
+    /// Base = two usage meters; reset timers and the spend meter each add a fixed slice.
+    /// </summary>
+    private void UpdateWindowHeight()
+    {
+        double h = 68;                       // two usage meters only
+        if (_showResetTimers) h += 12;       // both reset-timer bars
+        if (SpendPanel.Visibility == Visibility.Visible) h += 21; // spend bar + spacing
+        OuterBorder.Height = h;
+    }
+
+    // --- LiteLLM Vertex spend meter ---
+
+    private static readonly Brush SpendBaseBrush = new SolidColorBrush(Color.FromRgb(0x26, 0xA6, 0x9A)); // teal
+
+    private static Brush GetSpendBrush(double pctOfBudget)
+    {
+        if (pctOfBudget >= 90) return new SolidColorBrush(Color.FromRgb(244, 67, 54));  // red
+        if (pctOfBudget >= 70) return new SolidColorBrush(Color.FromRgb(255, 152, 0));  // orange
+        return SpendBaseBrush;
+    }
+
+    private void OnSpendUpdated(double spend)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            _lastSpend = spend;
+            _hasSpendData = true;
+            UpdateSpendBar();
+        });
+    }
+
+    private void OnSpendError(string error)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            SpendTrack.ToolTip = $"LiteLLM Spend: {error}";
+        });
+    }
+
+    private void UpdateSpendBar()
+    {
+        if (!_hasSpendData)
+        {
+            SpendBarText.Text = _spendWindow.Tag();
+            return;
+        }
+
+        var budget = AppSettingsService.Current.LiteLLMMonthlyBudget;
+        var pct = budget > 0 ? (_lastSpend / budget) * 100.0 : 0;
+        var clamped = Math.Clamp(pct, 0, 100);
+
+        var trackW = SpendTrack.ActualWidth;
+        SpendFill.Background = GetSpendBrush(pct);
+        if (trackW > 0)
+        {
+            var animation = new DoubleAnimation
+            {
+                To = trackW * (clamped / 100.0),
+                Duration = TimeSpan.FromMilliseconds(400),
+                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseInOut }
+            };
+            SpendFill.BeginAnimation(WidthProperty, animation);
+        }
+
+        SpendBarText.Text = $"{_spendWindow.Tag()}  ${_lastSpend:0.00}";
+        SpendTrack.ToolTip =
+            $"LiteLLM {_spendWindow.Description()}: ${_lastSpend:0.00} of ${budget:0} budget ({pct:0.#}%)";
+    }
+
+    /// <summary>Applies spend visibility + polling based on config and the menu toggle.</summary>
+    private void ApplySpendState()
+    {
+        var shouldShow = _showSpend && AppSettingsService.HasLiteLLMKey;
+        SpendPanel.Visibility = shouldShow ? Visibility.Visible : Visibility.Collapsed;
+        UpdateWindowHeight();
+
+        if (shouldShow)
+        {
+            _spendService.CurrentWindow = _spendWindow;
+            _spendService.StartPolling(AppSettingsService.Current.PollingIntervalSeconds);
+        }
+        else
+        {
+            _spendService.StopPolling();
+        }
+    }
+
+    private void SpendTrack_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        // Consume the click so it doesn't reach the window drag/navigate handler.
+        e.Handled = true;
+
+        _spendWindow = _spendWindow.Next();
+        AppSettingsService.Current.LiteLLMSpendWindow = _spendWindow.Tag();
+        AppSettingsService.Save();
+
+        // Show the tag immediately; the dollar figure refreshes on the next fetch.
+        _hasSpendData = false;
+        SpendBarText.Text = _spendWindow.Tag();
+        SpendFill.BeginAnimation(WidthProperty, null);
+        SpendFill.Width = 0;
+
+        _spendService.CurrentWindow = _spendWindow;
+        _spendService.RefreshNow();
+    }
+
+    private void ShowLiteLLMSpend_Click(object sender, RoutedEventArgs e)
+    {
+        _showSpend = ShowLiteLLMSpendMenuItem.IsChecked;
+        AppSettingsService.Current.ShowLiteLLMSpend = _showSpend;
+        AppSettingsService.Save();
+        ApplySpendState();
     }
 
     private static readonly Brush DragBorderBrush = new SolidColorBrush(Color.FromArgb(0xCC, 0x44, 0x88, 0xFF));
@@ -572,6 +707,10 @@ public partial class MainWindow : Window
             _authExpired = false;
             ShowStatus(null);
             ApplyPauseState();
+            // Key / budget / base URL may have changed — re-evaluate the spend meter.
+            _hasSpendData = false;
+            ApplySpendState();
+            UpdateSpendBar();
         }
     }
 
@@ -614,6 +753,7 @@ public partial class MainWindow : Window
                 _trayIcon.ContextMenuStrip?.Dispose();
                 _trayIcon.Dispose();
                 _apiService.Dispose();
+                _spendService.Dispose();
                 Application.Current.Shutdown();
             });
             _trayIcon.ContextMenuStrip = trayMenu;
@@ -714,6 +854,7 @@ public partial class MainWindow : Window
             _trayIcon.Dispose();
         }
         _apiService.Dispose();
+        _spendService.Dispose();
         Application.Current.Shutdown();
     }
 
@@ -789,6 +930,7 @@ public partial class MainWindow : Window
             _trayIcon.Dispose();
         }
         _apiService.Dispose();
+        _spendService.Dispose();
         base.OnClosed(e);
 
         // Safety net: force-kill the process so stale threadpool work

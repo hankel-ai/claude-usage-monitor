@@ -7,6 +7,7 @@ A lightweight Windows desktop widget that displays your Claude AI usage as visua
 ## Features
 
 - **Two usage meters** — 5-hour (green) and 7-day (blue) utilization bars
+- **LiteLLM Vertex spend meter** — optional third bar showing Total Spend from a LiteLLM proxy against a monthly budget; click to cycle the time window (Today / 7d / 30d / MTD / YTD)
 - **Delta highlights** — usage increase since last poll shown as a brighter strip at the end of each bar
 - **Reset timer bars** — optional thin red bars showing time elapsed in each rate limit window
 - **Color thresholds** — bars turn orange at 70% and red at 90%
@@ -84,9 +85,40 @@ Response format:
 }
 ```
 
+## LiteLLM Vertex Spend Meter
+
+An optional third bar shows **Total Spend** from a self-hosted [LiteLLM](https://litellm.ai) proxy
+(e.g. `https://litellm.example.com`) so you can watch proxy costs alongside your Claude usage.
+
+- **On by default** once a key is configured; toggle it via right-click → **Show LiteLLM Spend**.
+- The bar fills toward a **monthly budget** (default `$500`) and turns orange at 70% / red at 90%,
+  matching the usage meters. The bar text shows the window tag and the real dollar figure, e.g. `MTD  $123.45`.
+- **Click the bar** to cycle the relative window: **Today → 7d → 30d → MTD → YTD**. The selection persists.
+
+### Configuration
+
+Right-click → **Settings** → **LiteLLM Vertex Spend**:
+
+- **API key** — a LiteLLM admin/master key (`sk-...`) with permission to read spend. Stored in `settings.json`.
+- **Base URL** — the proxy URL (e.g. `https://litellm.example.com`).
+- **Monthly budget (USD)** — the ceiling the bar fills toward (default `500`).
+
+### API endpoint
+
+The spend meter polls (Bearer-authenticated with the configured key):
+
+```
+GET <base-url>/user/daily/activity/aggregated?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD
+Authorization: Bearer <litellm-key>
+```
+
+and reads `metadata.total_spend` from the response — the same figure shown on the LiteLLM Usage page.
+Date ranges are computed in local time from the selected window.
+
 ### App settings location
 
-The app stores its own settings (polling interval, window position, always-on-top preference) at:
+The app stores its own settings (polling interval, window position, always-on-top preference,
+LiteLLM key/URL/budget/window) at:
 
 ```
 %APPDATA%\ClaudeUsageMonitor\settings.json

@@ -12,6 +12,13 @@ public class AppSettingsData
     public double WindowLeft { get; set; } = -1;
     public double WindowTop { get; set; } = -1;
     public int HoverZoomDelayMs { get; set; } = 300;
+
+    // --- LiteLLM Vertex spend meter ---
+    public string LiteLLMApiKey { get; set; } = "";
+    public string LiteLLMBaseUrl { get; set; } = "https://litellm.example.com";
+    public double LiteLLMMonthlyBudget { get; set; } = 500;
+    public bool ShowLiteLLMSpend { get; set; } = true;
+    public string LiteLLMSpendWindow { get; set; } = "MTD";
 }
 
 public static class AppSettingsService
@@ -102,6 +109,9 @@ public static class AppSettingsService
     }
 
     public static bool HasCredentials => !string.IsNullOrEmpty(GetOAuthToken());
+
+    /// <summary>True when a LiteLLM Vertex API key has been configured.</summary>
+    public static bool HasLiteLLMKey => !string.IsNullOrWhiteSpace(Current.LiteLLMApiKey);
 
     /// <summary>
     /// Reads the token expiry from claudeAiOauth.expiresAt (Unix milliseconds).

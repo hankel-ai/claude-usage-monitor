@@ -13,6 +13,12 @@ public partial class SettingsWindow : Window
         IntervalSlider.Value = AppSettingsService.Current.PollingIntervalSeconds;
         HoverDelaySlider.Value = AppSettingsService.Current.HoverZoomDelayMs;
         StartupCheckBox.IsChecked = AppSettingsService.GetLaunchOnStartup();
+
+        LiteLLMKeyBox.Password = AppSettingsService.Current.LiteLLMApiKey;
+        LiteLLMBaseUrlBox.Text = AppSettingsService.Current.LiteLLMBaseUrl;
+        LiteLLMBudgetBox.Text = AppSettingsService.Current.LiteLLMMonthlyBudget
+            .ToString(System.Globalization.CultureInfo.InvariantCulture);
+
         UpdateIntervalLabel();
         UpdateHoverDelayLabel();
         UpdateAuthStatus();
@@ -70,6 +76,18 @@ public partial class SettingsWindow : Window
     {
         AppSettingsService.Current.PollingIntervalSeconds = (int)IntervalSlider.Value;
         AppSettingsService.Current.HoverZoomDelayMs = (int)HoverDelaySlider.Value;
+
+        AppSettingsService.Current.LiteLLMApiKey = LiteLLMKeyBox.Password.Trim();
+        var baseUrl = LiteLLMBaseUrlBox.Text.Trim();
+        AppSettingsService.Current.LiteLLMBaseUrl = string.IsNullOrWhiteSpace(baseUrl)
+            ? "https://litellm.example.com" : baseUrl;
+        if (double.TryParse(LiteLLMBudgetBox.Text.Trim(),
+                System.Globalization.NumberStyles.Any,
+                System.Globalization.CultureInfo.InvariantCulture, out var budget) && budget > 0)
+        {
+            AppSettingsService.Current.LiteLLMMonthlyBudget = budget;
+        }
+
         AppSettingsService.Save();
         AppSettingsService.SetLaunchOnStartup(StartupCheckBox.IsChecked == true);
         DialogResult = true;
