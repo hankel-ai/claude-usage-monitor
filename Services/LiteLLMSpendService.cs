@@ -213,7 +213,8 @@ public class LiteLLMSpendService : IDisposable
             var (start, end) = window.ComputeRange();
             var startStr = start.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
             var endStr = end.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-            var url = $"/user/daily/activity/aggregated?start_date={startStr}&end_date={endStr}";
+            var tzOffset = -(int)TimeZoneInfo.Local.GetUtcOffset(DateTime.Now).TotalMinutes;
+            var url = $"/user/daily/activity/aggregated?start_date={startStr}&end_date={endStr}&timezone={tzOffset}";
 
             var client = EnsureHttpClient();
             var request = new HttpRequestMessage(HttpMethod.Get, url);

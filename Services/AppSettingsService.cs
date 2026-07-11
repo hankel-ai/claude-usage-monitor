@@ -19,6 +19,8 @@ public class AppSettingsData
     public double LiteLLMMonthlyBudget { get; set; } = 500;
     public bool ShowLiteLLMSpend { get; set; } = true;
     public string LiteLLMSpendWindow { get; set; } = "MTD";
+    public int LiteLLMPollingIntervalSeconds { get; set; } = 120;
+    public bool LiteLLMSpendPaused { get; set; }
 }
 
 public static class AppSettingsService

@@ -33,6 +33,8 @@ an optional **LiteLLM Vertex spend** bar (Total Spend from a self-hosted LiteLLM
 - **Meters are percentages (0–100)**; the spend meter is a dollar figure rendered as a bar against a
   configurable **monthly budget** (default $500). Color thresholds are shared: orange ≥70%, red ≥90%.
 - **Spend section** is on by default when a LiteLLM key exists; toggled via `Show LiteLLM Spend` menu.
+  Has its own polling interval (`LiteLLMPollingIntervalSeconds`, default 120) and pause toggle
+  (`Pause LiteLLM Spend` in the context menu), both independent of the Claude API polling.
   Clicking the spend bar cycles the window `Today → 7d → 30d → MTD → YTD` (`e.Handled = true` so the
   click doesn't reach the window drag/navigate handler). Selection + visibility persist in settings.
 - **Window height** is sized additively in `UpdateWindowHeight()` (base 68, +12 timers, +21 spend) —
@@ -40,6 +42,6 @@ an optional **LiteLLM Vertex spend** bar (Total Spend from a self-hosted LiteLLM
 - Both API services log to the shared `%APPDATA%\ClaudeUsageMonitor\log.txt` (auto-truncated at 1 MB).
 - The LiteLLM key is stored in plaintext in `settings.json` (home-lab, single-user). Read via
   `PasswordBox.Password` in the settings dialog (WPF `PasswordBox` can't be data-bound).
-- Spend endpoint: `GET /user/daily/activity/aggregated?start_date&end_date` → `metadata.total_spend`.
-  If it under-reports (per-user vs. global), fall back to summing `total_spend` across
-  `/global/spend/report?group_by=team` rows.
+- Spend endpoint: `GET /user/daily/activity/aggregated?start_date&end_date&timezone=<offset>` →
+  `metadata.total_spend`. The `timezone` param (JS-convention minutes, e.g. 240 for EDT) is
+  **required** — without it the server bins activity into the wrong day boundary.

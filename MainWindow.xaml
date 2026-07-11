@@ -24,6 +24,8 @@
                       IsCheckable="True" IsChecked="True" Click="ShowLiteLLMSpend_Click"/>
             <MenuItem x:Name="PausePollingMenuItem" Header="Pause Polling"
                       IsCheckable="True" Click="PausePolling_Click"/>
+            <MenuItem x:Name="PauseSpendMenuItem" Header="Pause LiteLLM Spend"
+                      IsCheckable="True" Click="PauseSpend_Click"/>
             <Separator/>
             <MenuItem Header="Settings..." Click="Settings_Click"/>
             <MenuItem Header="Refresh Now" Click="Refresh_Click"/>
@@ -195,6 +197,22 @@
                         </Grid>
                     </Border>
                 </Grid>
+
+                <!-- Usage-section pause overlay (covers rows 0-6 only) -->
+                <Border x:Name="PausedOverlay" Grid.Row="0" Grid.RowSpan="7"
+                        Background="#60000000"
+                        Visibility="Collapsed" IsHitTestVisible="False">
+                    <TextBlock x:Name="PausedOverlayText"
+                               Foreground="White" FontSize="9" FontFamily="Segoe UI" FontWeight="SemiBold"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               TextAlignment="Center" Visibility="Collapsed"
+                               Effect="{StaticResource BarTextShadow}"/>
+                </Border>
+
+                <!-- Spend-section pause overlay (covers row 7 only) -->
+                <Border x:Name="SpendPausedOverlay" Grid.Row="7"
+                        Background="#60000000"
+                        Visibility="Collapsed" IsHitTestVisible="False"/>
             </Grid>
 
             <!-- Status text for no-credentials / errors -->
@@ -202,16 +220,6 @@
                        Foreground="#80FFFFFF" FontSize="10" FontFamily="Segoe UI"
                        HorizontalAlignment="Center" VerticalAlignment="Center"
                        IsHitTestVisible="False" TextAlignment="Center"/>
-
-            <!-- Paused dim overlay (renders on top of content) -->
-            <Border x:Name="PausedOverlay" Background="#60000000" CornerRadius="8"
-                    Visibility="Collapsed" IsHitTestVisible="False">
-                <TextBlock x:Name="PausedOverlayText"
-                           Foreground="White" FontSize="9" FontFamily="Segoe UI" FontWeight="SemiBold"
-                           HorizontalAlignment="Center" VerticalAlignment="Center"
-                           TextAlignment="Center" Visibility="Collapsed"
-                           Effect="{StaticResource BarTextShadow}"/>
-            </Border>
         </Grid>
     </Border>
 </Window>

@@ -110,6 +110,28 @@
                                  Background="#2A2A2A" Foreground="#EEE" BorderBrush="#555"/>
                         <TextBlock Text="The spend bar fills toward this budget (turns orange at 70%, red at 90%)."
                                    Foreground="#777" FontSize="10.5" Margin="0,4,0,0"/>
+
+                        <TextBlock Text="Spend polling interval" Foreground="#CCC" FontSize="12"
+                                   Margin="0,12,0,4"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Slider x:Name="SpendIntervalSlider"
+                                    Minimum="60" Maximum="3600"
+                                    Value="120"
+                                    TickFrequency="60"
+                                    IsSnapToTickEnabled="True"
+                                    VerticalAlignment="Center"
+                                    ValueChanged="SpendIntervalSlider_ValueChanged"/>
+                            <TextBlock x:Name="SpendIntervalLabel" Grid.Column="1"
+                                       Foreground="#EEE" FontSize="13" FontWeight="SemiBold"
+                                       Width="80" TextAlignment="Right"
+                                       VerticalAlignment="Center" Margin="12,0,0,0"/>
+                        </Grid>
+                        <TextBlock Text="How often to fetch spend data from LiteLLM (independent of usage polling)"
+                                   Foreground="#777" FontSize="10.5" Margin="0,4,0,0"/>
                     </StackPanel>
                 </Border>
 

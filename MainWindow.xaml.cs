@@ -42,6 +42,7 @@ public partial class MainWindow : Window
 
     private bool _showResetTimers = true;
     private bool _showSpend = true;
+    private bool _spendPaused;
     private SpendWindow _spendWindow = SpendWindow.MonthToDate;
     private double _lastSpend;
     private bool _hasSpendData;
@@ -88,8 +89,10 @@ public partial class MainWindow : Window
 
         // LiteLLM Vertex spend meter
         _showSpend = settings.ShowLiteLLMSpend;
+        _spendPaused = settings.LiteLLMSpendPaused;
         _spendWindow = SpendWindowExtensions.Parse(settings.LiteLLMSpendWindow);
         ShowLiteLLMSpendMenuItem.IsChecked = _showSpend;
+        PauseSpendMenuItem.IsChecked = _spendPaused;
         _spendService = new LiteLLMSpendService { CurrentWindow = _spendWindow };
         _spendService.SpendUpdated += OnSpendUpdated;
         _spendService.SpendError += OnSpendError;
@@ -122,6 +125,7 @@ public partial class MainWindow : Window
 
         // Spend meter is only shown/polled when a LiteLLM key is configured.
         ApplySpendState();
+        SpendPausedOverlay.Visibility = _spendPaused ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void ShowStatus(string? message)
@@ -447,10 +451,10 @@ public partial class MainWindow : Window
         SpendPanel.Visibility = shouldShow ? Visibility.Visible : Visibility.Collapsed;
         UpdateWindowHeight();
 
-        if (shouldShow)
+        if (shouldShow && !_spendPaused)
         {
             _spendService.CurrentWindow = _spendWindow;
-            _spendService.StartPolling(AppSettingsService.Current.PollingIntervalSeconds);
+            _spendService.StartPolling(AppSettingsService.Current.LiteLLMPollingIntervalSeconds);
         }
         else
         {
@@ -483,6 +487,15 @@ public partial class MainWindow : Window
         AppSettingsService.Current.ShowLiteLLMSpend = _showSpend;
         AppSettingsService.Save();
         ApplySpendState();
+    }
+
+    private void PauseSpend_Click(object sender, RoutedEventArgs e)
+    {
+        _spendPaused = PauseSpendMenuItem.IsChecked;
+        AppSettingsService.Current.LiteLLMSpendPaused = _spendPaused;
+        AppSettingsService.Save();
+        ApplySpendState();
+        SpendPausedOverlay.Visibility = _spendPaused ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private static readonly Brush DragBorderBrush = new SolidColorBrush(Color.FromArgb(0xCC, 0x44, 0x88, 0xFF));

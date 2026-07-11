@@ -18,9 +18,11 @@ public partial class SettingsWindow : Window
         LiteLLMBaseUrlBox.Text = AppSettingsService.Current.LiteLLMBaseUrl;
         LiteLLMBudgetBox.Text = AppSettingsService.Current.LiteLLMMonthlyBudget
             .ToString(System.Globalization.CultureInfo.InvariantCulture);
+        SpendIntervalSlider.Value = AppSettingsService.Current.LiteLLMPollingIntervalSeconds;
 
         UpdateIntervalLabel();
         UpdateHoverDelayLabel();
+        UpdateSpendIntervalLabel();
         UpdateAuthStatus();
     }
 
@@ -65,6 +67,27 @@ public partial class SettingsWindow : Window
         UpdateHoverDelayLabel();
     }
 
+    private void SpendIntervalSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        UpdateSpendIntervalLabel();
+    }
+
+    private void UpdateSpendIntervalLabel()
+    {
+        if (SpendIntervalLabel == null) return;
+        var seconds = (int)SpendIntervalSlider.Value;
+        if (seconds >= 60)
+        {
+            var min = seconds / 60;
+            var sec = seconds % 60;
+            SpendIntervalLabel.Text = sec > 0 ? $"{min}m {sec}s" : $"{min} min";
+        }
+        else
+        {
+            SpendIntervalLabel.Text = $"{seconds}s";
+        }
+    }
+
     private void UpdateHoverDelayLabel()
     {
         if (HoverDelayLabel == null) return;
@@ -81,6 +104,7 @@ public partial class SettingsWindow : Window
         var baseUrl = LiteLLMBaseUrlBox.Text.Trim();
         AppSettingsService.Current.LiteLLMBaseUrl = string.IsNullOrWhiteSpace(baseUrl)
             ? "https://litellm.example.com" : baseUrl;
+        AppSettingsService.Current.LiteLLMPollingIntervalSeconds = (int)SpendIntervalSlider.Value;
         if (double.TryParse(LiteLLMBudgetBox.Text.Trim(),
                 System.Globalization.NumberStyles.Any,
                 System.Globalization.CultureInfo.InvariantCulture, out var budget) && budget > 0)
