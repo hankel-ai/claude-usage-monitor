@@ -42,6 +42,16 @@ an optional **LiteLLM Vertex spend** bar (Total Spend from a self-hosted LiteLLM
 - Both API services log to the shared `%APPDATA%\ClaudeUsageMonitor\log.txt` (auto-truncated at 1 MB).
 - The LiteLLM key is stored in plaintext in `settings.json` (home-lab, single-user). Read via
   `PasswordBox.Password` in the settings dialog (WPF `PasswordBox` can't be data-bound).
-- Spend endpoint: `GET /user/daily/activity/aggregated?start_date&end_date&timezone=<offset>` →
-  `metadata.total_spend`. The `timezone` param (JS-convention minutes, e.g. 240 for EDT) is
-  **required** — without it the server bins activity into the wrong day boundary.
+- **Spend / timezone (hybrid, Eastern day boundaries):** LiteLLM's daily-activity tables are
+  whole-**UTC**-day buckets; the `timezone` param on `/user/daily/activity/aggregated` is **ignored
+  server-side** (verified in v1.91.2 `common_daily_activity._adjust_dates_for_timezone`, a documented
+  pass-through), and the container `TZ` can't move it either (`startTime` is forced to UTC before
+  bucketing). So `LiteLLMSpendService`:
+  - **Today / 7d** → sum granular per-request rows from `GET /spend/logs/ui?start_date&end_date&page&page_size`
+    whose UTC instants fall in the **Eastern** window (`page_size` **caps at 100** → paginate on
+    `total_pages`; envelope `total` is a row count, not spend — sum `data[].spend`). Exact Eastern.
+  - **30d / MTD / YTD** → keep `GET /user/daily/activity/aggregated` → `metadata.total_spend` (UTC
+    buckets; a few boundary hours are negligible on a monthly/yearly total, and it avoids paginating
+    thousands of fat rows each poll).
+  - Eastern is pinned via `TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time")` (auto EST/EDT),
+    not the machine's local zone.

@@ -179,7 +179,9 @@
                     </Grid.ColumnDefinitions>
                     <TextBlock x:Name="SpendLabel" Text="API Spend" Foreground="#999" FontSize="8.5"
                                FontFamily="Segoe UI" VerticalAlignment="Center"
-                               TextTrimming="None"/>
+                               TextTrimming="None" Background="Transparent" Cursor="Hand"
+                               MouseLeftButtonDown="SpendLabel_MouseLeftButtonDown"
+                               ToolTip="Open LiteLLM console"/>
                     <Border Grid.Column="1" Background="#2A2A2A" CornerRadius="3.5"
                             Height="15" ClipToBounds="True"
                             x:Name="SpendTrack" Cursor="Hand"

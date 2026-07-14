@@ -95,6 +95,11 @@ public class LiteLLMSpendService : IDisposable
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "ClaudeUsageMonitor", "log.txt");
 
+    // Explicit Eastern zone (the Windows id auto-handles EST/EDT) — the spend report's day
+    // boundaries are pinned to Eastern regardless of the machine's local timezone.
+    private static readonly TimeZoneInfo Eastern =
+        TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
+
     private HttpClient? _httpClient;
     private string? _httpClientBaseUrl;
     private Timer? _timer;
@@ -210,6 +215,12 @@ public class LiteLLMSpendService : IDisposable
                 return null;
             }
 
+            // Today / 7d: honor Eastern day boundaries exactly by summing granular per-request
+            // rows. The daily-activity aggregate below is whole-UTC-day bucketed (server ignores
+            // the timezone param), which is fine for the wide windows but wrong for "Today".
+            if (window is SpendWindow.Today or SpendWindow.Last7Days)
+                return await FetchGranularEasternAsync(window, key, ct);
+
             var (start, end) = window.ComputeRange();
             var startStr = start.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
             var endStr = end.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
@@ -277,6 +288,107 @@ public class LiteLLMSpendService : IDisposable
         catch
         {
             return null;
+        }
+    }
+
+    /// <summary>Today's date in the Eastern zone (EST/EDT handled automatically).</summary>
+    private static DateOnly EasternToday()
+        => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, Eastern).DateTime);
+
+    /// <summary>UTC instant corresponding to Eastern wall-clock midnight of the given date.</summary>
+    private static DateTime EasternMidnightUtc(DateOnly d)
+        => TimeZoneInfo.ConvertTimeToUtc(
+               DateTime.SpecifyKind(d.ToDateTime(TimeOnly.MinValue), DateTimeKind.Unspecified),
+               Eastern);
+
+    /// <summary>
+    /// Exact Eastern-binned spend for Today / Last7Days by summing granular per-request rows from
+    /// <c>/spend/logs/ui</c>. LiteLLM's daily-activity tables are whole-UTC-day buckets (the server
+    /// ignores the timezone param by design), so the only way to honor Eastern day boundaries is to
+    /// sum raw rows whose UTC instants fall inside the Eastern window. Empty result is a real $0.00.
+    /// </summary>
+    private async Task<double?> FetchGranularEasternAsync(SpendWindow window, string key, CancellationToken ct)
+    {
+        var todayEt = EasternToday();
+        var startEt = window == SpendWindow.Today ? todayEt : todayEt.AddDays(-6);
+
+        // /spend/logs/ui filters start_date/end_date on the stored UTC instant, so pass the UTC
+        // instants that bound the Eastern window. Upper bound is exclusive Eastern-midnight-tomorrow,
+        // capped at now (no future rows, and avoids sending a future end_date).
+        var startUtc = EasternMidnightUtc(startEt);
+        var endUtc = EasternMidnightUtc(todayEt.AddDays(1));
+        if (endUtc > DateTime.UtcNow) endUtc = DateTime.UtcNow;
+
+        var s = Uri.EscapeDataString(startUtc.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture));
+        var e = Uri.EscapeDataString(endUtc.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture));
+
+        var client = EnsureHttpClient();
+        double total = 0;
+        int page = 1, totalPages = 1;
+        const int pageSize = 100, maxPages = 100;   // /spend/logs/ui caps page_size at 100
+
+        do
+        {
+            var url = $"/spend/logs/ui?start_date={s}&end_date={e}&page={page}&page_size={pageSize}";
+            var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.Add("Authorization", $"Bearer {key}");
+
+            var response = await client.SendAsync(request, ct);
+            Log($"INFO  LiteLLM spend/logs/ui {window.Tag()} p{page} -> {(int)response.StatusCode} {response.StatusCode}");
+
+            if (response.StatusCode == HttpStatusCode.Unauthorized ||
+                response.StatusCode == HttpStatusCode.Forbidden)
+            {
+                SpendError?.Invoke("LiteLLM auth failed (check key)");
+                return null;
+            }
+
+            response.EnsureSuccessStatusCode();
+
+            var json = await response.Content.ReadAsStringAsync(ct);
+            if (!TryParseGranularPage(json, out var pageSum, out totalPages))
+            {
+                SpendError?.Invoke("LiteLLM: bad spend/logs response");
+                return null;
+            }
+
+            total += pageSum;
+            page++;
+        }
+        while (page <= totalPages && page <= maxPages);
+
+        Log($"OK    LiteLLM spend {window.Tag()} (ET granular) = ${total:0.00}");
+        return total;
+    }
+
+    /// <summary>
+    /// /spend/logs/ui page shape: { "data": [ { "spend": 0.01, ... }, ... ], "total_pages": N, ... }.
+    /// Sums the numeric spend of each row on the page. Note the envelope's "total" is a row count,
+    /// not a spend sum, so it is deliberately not used here.
+    /// </summary>
+    private static bool TryParseGranularPage(string json, out double sum, out int totalPages)
+    {
+        sum = 0;
+        totalPages = 1;
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            if (root.TryGetProperty("total_pages", out var tp) && tp.ValueKind == JsonValueKind.Number)
+                totalPages = tp.GetInt32();
+            if (root.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var row in data.EnumerateArray())
+                {
+                    if (row.TryGetProperty("spend", out var sp) && sp.ValueKind == JsonValueKind.Number)
+                        sum += sp.GetDouble();
+                }
+            }
+            return true;
+        }
+        catch
+        {
+            return false;
         }
     }
 

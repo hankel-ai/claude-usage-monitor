@@ -481,6 +481,23 @@ public partial class MainWindow : Window
         _spendService.RefreshNow();
     }
 
+    private void SpendLabel_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        // Open the LiteLLM console (admin UI) in the default browser. Consume the click so it
+        // doesn't reach the window drag handler.
+        e.Handled = true;
+
+        var baseUrl = AppSettingsService.Current.LiteLLMBaseUrl?.TrimEnd('/');
+        if (string.IsNullOrWhiteSpace(baseUrl))
+            return;
+
+        try
+        {
+            Process.Start(new ProcessStartInfo($"{baseUrl}/ui/") { UseShellExecute = true });
+        }
+        catch { }
+    }
+
     private void ShowLiteLLMSpend_Click(object sender, RoutedEventArgs e)
     {
         _showSpend = ShowLiteLLMSpendMenuItem.IsChecked;
