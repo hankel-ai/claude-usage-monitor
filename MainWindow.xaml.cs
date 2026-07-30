@@ -43,6 +43,7 @@ public partial class MainWindow : Window
     private bool _showResetTimers = true;
     private bool _showSpend = true;
     private bool _spendPaused;
+    private bool _spendNetworkError;
     private SpendWindow _spendWindow = SpendWindow.MonthToDate;
     private double _lastSpend;
     private bool _hasSpendData;
@@ -96,6 +97,7 @@ public partial class MainWindow : Window
         _spendService = new LiteLLMSpendService { CurrentWindow = _spendWindow };
         _spendService.SpendUpdated += OnSpendUpdated;
         _spendService.SpendError += OnSpendError;
+        _spendService.NetworkError += OnSpendNetworkError;
 
         FiveHourTrack.SizeChanged += (_, _) => UpdateAllBars();
         SevenDayTrack.SizeChanged += (_, _) => UpdateAllBars();
@@ -402,6 +404,12 @@ public partial class MainWindow : Window
         {
             _lastSpend = spend;
             _hasSpendData = true;
+            if (_spendNetworkError)
+            {
+                _spendNetworkError = false;
+                SpendErrorOverlay.Visibility = Visibility.Collapsed;
+                UpdateTrayIcon();
+            }
             UpdateSpendBar();
         });
     }
@@ -411,6 +419,17 @@ public partial class MainWindow : Window
         Dispatcher.Invoke(() =>
         {
             SpendTrack.ToolTip = $"LiteLLM Spend: {error}";
+        });
+    }
+
+    private void OnSpendNetworkError()
+    {
+        Dispatcher.Invoke(() =>
+        {
+            _spendNetworkError = true;
+            if (_showSpend && !_spendPaused && SpendPanel.Visibility == Visibility.Visible)
+                SpendErrorOverlay.Visibility = Visibility.Visible;
+            UpdateTrayIcon();
         });
     }
 
@@ -450,6 +469,13 @@ public partial class MainWindow : Window
         var shouldShow = _showSpend && AppSettingsService.HasLiteLLMKey;
         SpendPanel.Visibility = shouldShow ? Visibility.Visible : Visibility.Collapsed;
         UpdateWindowHeight();
+
+        // Hide error overlay when the section is hidden, paused, or config just changed
+        if (!shouldShow || _spendPaused)
+        {
+            SpendErrorOverlay.Visibility = Visibility.Collapsed;
+            _spendNetworkError = false;
+        }
 
         if (shouldShow && !_spendPaused)
         {
@@ -855,6 +881,14 @@ public partial class MainWindow : Window
             g.FillRectangle(brush, rightX, barBottom - timerFillH, barWidth, timerFillH);
         }
 
+        // Amber dot in top-right corner when LiteLLM has a network error (and isn't paused)
+        if (_spendNetworkError && !_spendPaused && _showSpend)
+        {
+            var amber = Drawing.Color.FromArgb(255, 183, 77);
+            using var brush = new Drawing.SolidBrush(amber);
+            g.FillRectangle(brush, 13, 0, 3, 3);
+        }
+
         var oldIcon = _trayIcon.Icon;
         _trayIcon.Icon = Drawing.Icon.FromHandle(bmp.GetHicon());
         if (oldIcon != null) NativeMethods.DestroyIcon(oldIcon.Handle);
@@ -867,6 +901,8 @@ public partial class MainWindow : Window
             if (remaining.TotalSeconds > 0)
                 tip += $" | resets in {FormatTimeSpan(remaining)}";
         }
+        if (_spendNetworkError && !_spendPaused && _showSpend)
+            tip += " | LiteLLM offline";
         _trayIcon.Text = tip;
     }
 

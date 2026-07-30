@@ -215,6 +215,18 @@
                 <Border x:Name="SpendPausedOverlay" Grid.Row="7"
                         Background="#60000000"
                         Visibility="Collapsed" IsHitTestVisible="False"/>
+
+                <!-- Spend-section network-error overlay (covers row 7 only) -->
+                <Border x:Name="SpendErrorOverlay" Grid.Row="7"
+                        Background="#60000000"
+                        Visibility="Collapsed" IsHitTestVisible="False"
+                        ToolTip="Cannot reach LiteLLM — connection failed">
+                    <TextBlock Text="Offline" Foreground="#FFB74D" FontSize="9" FontWeight="SemiBold"
+                               FontFamily="Segoe UI"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               IsHitTestVisible="False"
+                               Effect="{StaticResource BarTextShadow}"/>
+                </Border>
             </Grid>
 
             <!-- Status text for no-credentials / errors -->

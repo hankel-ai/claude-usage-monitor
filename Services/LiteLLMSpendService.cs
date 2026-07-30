@@ -114,6 +114,8 @@ public class LiteLLMSpendService : IDisposable
     /// <summary>Fired with the total spend (USD) for <see cref="CurrentWindow"/>.</summary>
     public event Action<double>? SpendUpdated;
     public event Action<string>? SpendError;
+    /// <summary>Fired when the HTTP request fails at the transport level (DNS, refused, timeout).</summary>
+    public event Action? NetworkError;
 
     private static void Log(string message)
     {
@@ -259,6 +261,8 @@ public class LiteLLMSpendService : IDisposable
         {
             Log($"ERROR LiteLLM network: {ex.Message}");
             SpendError?.Invoke($"LiteLLM network error");
+            if (ex.StatusCode == null)
+                NetworkError?.Invoke();
             return null;
         }
         catch (Exception ex)
