@@ -21,12 +21,16 @@ public partial class MainWindow : Window
     private static readonly TimeSpan SevenDayWindow = TimeSpan.FromDays(7);
 
     private static readonly double BaseContentWidth = 220;
-    // Matches the tallest panel (both usage meters + reset timers + spend bar) so the
-    // default bottom-right anchor never tucks content under the taskbar. See UpdateWindowHeight().
-    private static readonly double BaseContentHeight = 101;
+    // Matches the tallest panel (both usage meters + reset timers + LiteLLM spend bar +
+    // OpenRouter bar) so the default bottom-right anchor never tucks content under the
+    // taskbar. See UpdateWindowHeight().
+    // NOTE: hover zoom is 1.5x, so the Window's own Height in XAML must exceed this * 1.5
+    // (119 * 1.5 = 178.5, hence Height="240") or the bottom bar clips while zoomed.
+    private static readonly double BaseContentHeight = 119;
 
     private readonly ClaudeApiService _apiService;
     private readonly LiteLLMSpendService _spendService;
+    private readonly OpenRouterSpendService _openRouterService;
     private DispatcherTimer? _localTimer;
 
     // Pause state — any true flag suppresses polling
@@ -47,6 +51,12 @@ public partial class MainWindow : Window
     private SpendWindow _spendWindow = SpendWindow.MonthToDate;
     private double _lastSpend;
     private bool _hasSpendData;
+
+    private bool _showOpenRouter = true;
+    private bool _openRouterPaused;
+    private bool _openRouterNetworkError;
+    private OpenRouterWindow _openRouterWindow = OpenRouterWindow.MonthToDate;
+    private OpenRouterSnapshot? _openRouterSnapshot;
     private UsageData _lastUsage = new();
     private double _prevFiveHour;
     private double _prevSevenDay;
@@ -99,11 +109,23 @@ public partial class MainWindow : Window
         _spendService.SpendError += OnSpendError;
         _spendService.NetworkError += OnSpendNetworkError;
 
+        // OpenRouter spend meter
+        _showOpenRouter = settings.ShowOpenRouterSpend;
+        _openRouterPaused = settings.OpenRouterSpendPaused;
+        _openRouterWindow = OpenRouterWindowExtensions.Parse(settings.OpenRouterSpendWindow);
+        ShowOpenRouterMenuItem.IsChecked = _showOpenRouter;
+        PauseOpenRouterMenuItem.IsChecked = _openRouterPaused;
+        _openRouterService = new OpenRouterSpendService();
+        _openRouterService.SnapshotUpdated += OnOpenRouterUpdated;
+        _openRouterService.SpendError += OnOpenRouterError;
+        _openRouterService.NetworkError += OnOpenRouterNetworkError;
+
         FiveHourTrack.SizeChanged += (_, _) => UpdateAllBars();
         SevenDayTrack.SizeChanged += (_, _) => UpdateAllBars();
         FiveHourTimerTrack.SizeChanged += (_, _) => UpdateTimerBars();
         SevenDayTimerTrack.SizeChanged += (_, _) => UpdateTimerBars();
         SpendTrack.SizeChanged += (_, _) => UpdateSpendBar();
+        OpenRouterTrack.SizeChanged += (_, _) => UpdateOpenRouterBar();
 
         Loaded += OnLoaded;
     }
@@ -128,6 +150,10 @@ public partial class MainWindow : Window
         // Spend meter is only shown/polled when a LiteLLM key is configured.
         ApplySpendState();
         SpendPausedOverlay.Visibility = _spendPaused ? Visibility.Visible : Visibility.Collapsed;
+
+        // Likewise, the OpenRouter bar needs a management key before it appears.
+        ApplyOpenRouterState();
+        OpenRouterPausedOverlay.Visibility = _openRouterPaused ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void ShowStatus(string? message)
@@ -384,6 +410,7 @@ public partial class MainWindow : Window
         double h = 68;                       // two usage meters only
         if (_showResetTimers) h += 12;       // both reset-timer bars
         if (SpendPanel.Visibility == Visibility.Visible) h += 21; // spend bar + spacing
+        if (OpenRouterPanel.Visibility == Visibility.Visible) h += 18; // OpenRouter bar + spacing
         OuterBorder.Height = h;
     }
 
@@ -539,6 +566,182 @@ public partial class MainWindow : Window
         AppSettingsService.Save();
         ApplySpendState();
         SpendPausedOverlay.Visibility = _spendPaused ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    // --- OpenRouter spend meter ---
+
+    private static readonly Brush OpenRouterBaseBrush = new SolidColorBrush(Color.FromRgb(0x7E, 0x57, 0xC2)); // purple
+
+    private static Brush GetOpenRouterBrush(double pct)
+    {
+        if (pct >= 90) return new SolidColorBrush(Color.FromRgb(244, 67, 54));  // red
+        if (pct >= 70) return new SolidColorBrush(Color.FromRgb(255, 152, 0));  // orange
+        return OpenRouterBaseBrush;
+    }
+
+    private void OnOpenRouterUpdated(OpenRouterSnapshot snapshot)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            _openRouterSnapshot = snapshot;
+            if (_openRouterNetworkError)
+            {
+                _openRouterNetworkError = false;
+                OpenRouterErrorOverlay.Visibility = Visibility.Collapsed;
+                UpdateTrayIcon();
+            }
+            UpdateOpenRouterBar();
+        });
+    }
+
+    private void OnOpenRouterError(string error)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            OpenRouterTrack.ToolTip = $"OpenRouter: {error}";
+        });
+    }
+
+    private void OnOpenRouterNetworkError()
+    {
+        Dispatcher.Invoke(() =>
+        {
+            _openRouterNetworkError = true;
+            if (_showOpenRouter && !_openRouterPaused && OpenRouterPanel.Visibility == Visibility.Visible)
+                OpenRouterErrorOverlay.Visibility = Visibility.Visible;
+            UpdateTrayIcon();
+        });
+    }
+
+    /// <summary>
+    /// Renders the current stop from the cached snapshot. Two modes: the four window stops fill
+    /// toward the monthly budget, while Balance fills with credits *consumed* — so more fill
+    /// always means more spent, consistent with every other bar in the widget.
+    /// </summary>
+    private void UpdateOpenRouterBar()
+    {
+        var snapshot = _openRouterSnapshot;
+        if (snapshot == null)
+        {
+            OpenRouterBarText.Text = _openRouterWindow.Tag();
+            return;
+        }
+
+        double pct;
+        string text;
+        string detail;
+
+        if (_openRouterWindow == OpenRouterWindow.Balance)
+        {
+            if (snapshot.TotalCredits > 0)
+            {
+                pct = (snapshot.TotalUsage / snapshot.TotalCredits) * 100.0;
+                text = $"Bal  ${snapshot.RemainingCredits:0.00} left";
+                detail = $"OpenRouter credits: ${snapshot.RemainingCredits:0.00} left of " +
+                         $"${snapshot.TotalCredits:0.00} purchased ({pct:0.#}% used)";
+            }
+            else
+            {
+                // No purchased credits recorded (pay-as-you-go / unlimited): a fraction would be
+                // meaningless, so show lifetime spend flat rather than a misleading full bar.
+                pct = 0;
+                text = $"Bal  ${snapshot.TotalUsage:0.00} used";
+                detail = $"OpenRouter lifetime usage: ${snapshot.TotalUsage:0.00} " +
+                         "(no purchased-credit total reported)";
+            }
+        }
+        else
+        {
+            var spend = snapshot.For(_openRouterWindow);
+            var budget = AppSettingsService.Current.OpenRouterMonthlyBudget;
+            pct = budget > 0 ? (spend / budget) * 100.0 : 0;
+            text = $"{_openRouterWindow.Tag()}  ${spend:0.00}";
+            detail = $"OpenRouter {_openRouterWindow.Description()}: ${spend:0.00} of " +
+                     $"${budget:0} budget ({pct:0.#}%)";
+
+            // No partial/asterisk handling any more: every figure is read fresh from OpenRouter's
+            // own server-side counters, so none of them depends on the widget's uptime.
+        }
+
+        var clamped = Math.Clamp(pct, 0, 100);
+        var trackW = OpenRouterTrack.ActualWidth;
+        OpenRouterFill.Background = GetOpenRouterBrush(pct);
+        if (trackW > 0)
+        {
+            var animation = new DoubleAnimation
+            {
+                To = trackW * (clamped / 100.0),
+                Duration = TimeSpan.FromMilliseconds(400),
+                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseInOut }
+            };
+            OpenRouterFill.BeginAnimation(WidthProperty, animation);
+        }
+
+        OpenRouterBarText.Text = text;
+        // Always surface both halves: whichever stop is showing, the other number is one hover away.
+        OpenRouterTrack.ToolTip = _openRouterWindow == OpenRouterWindow.Balance
+            ? $"{detail}\nMonth to date: ${snapshot.MonthToDate:0.00}"
+            : $"{detail}\nCredits: ${snapshot.RemainingCredits:0.00} left of ${snapshot.TotalCredits:0.00}";
+    }
+
+    /// <summary>Applies OpenRouter visibility + polling based on config and the menu toggle.</summary>
+    private void ApplyOpenRouterState()
+    {
+        var shouldShow = _showOpenRouter && AppSettingsService.HasOpenRouterKey;
+        OpenRouterPanel.Visibility = shouldShow ? Visibility.Visible : Visibility.Collapsed;
+        UpdateWindowHeight();
+
+        if (!shouldShow || _openRouterPaused)
+        {
+            OpenRouterErrorOverlay.Visibility = Visibility.Collapsed;
+            _openRouterNetworkError = false;
+        }
+
+        if (shouldShow && !_openRouterPaused)
+            _openRouterService.StartPolling(AppSettingsService.Current.OpenRouterPollingIntervalSeconds);
+        else
+            _openRouterService.StopPolling();
+    }
+
+    private void OpenRouterTrack_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        // Consume the click so it doesn't reach the window drag/navigate handler.
+        e.Handled = true;
+
+        _openRouterWindow = _openRouterWindow.Next();
+        AppSettingsService.Current.OpenRouterSpendWindow = _openRouterWindow.Tag();
+        AppSettingsService.Save();
+
+        // One poll already cached every window, so this is a pure re-render — no refetch,
+        // and no blank bar while a request is in flight.
+        UpdateOpenRouterBar();
+    }
+
+    private void OpenRouterLabel_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        try
+        {
+            Process.Start(new ProcessStartInfo("https://openrouter.ai/activity") { UseShellExecute = true });
+        }
+        catch { }
+    }
+
+    private void ShowOpenRouter_Click(object sender, RoutedEventArgs e)
+    {
+        _showOpenRouter = ShowOpenRouterMenuItem.IsChecked;
+        AppSettingsService.Current.ShowOpenRouterSpend = _showOpenRouter;
+        AppSettingsService.Save();
+        ApplyOpenRouterState();
+    }
+
+    private void PauseOpenRouter_Click(object sender, RoutedEventArgs e)
+    {
+        _openRouterPaused = PauseOpenRouterMenuItem.IsChecked;
+        AppSettingsService.Current.OpenRouterSpendPaused = _openRouterPaused;
+        AppSettingsService.Save();
+        ApplyOpenRouterState();
+        OpenRouterPausedOverlay.Visibility = _openRouterPaused ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private static readonly Brush DragBorderBrush = new SolidColorBrush(Color.FromArgb(0xCC, 0x44, 0x88, 0xFF));
@@ -767,6 +970,9 @@ public partial class MainWindow : Window
             _hasSpendData = false;
             ApplySpendState();
             UpdateSpendBar();
+            _openRouterSnapshot = null;
+            ApplyOpenRouterState();
+            UpdateOpenRouterBar();
         }
     }
 
@@ -810,6 +1016,7 @@ public partial class MainWindow : Window
                 _trayIcon.Dispose();
                 _apiService.Dispose();
                 _spendService.Dispose();
+                _openRouterService.Dispose();
                 Application.Current.Shutdown();
             });
             _trayIcon.ContextMenuStrip = trayMenu;
@@ -881,8 +1088,10 @@ public partial class MainWindow : Window
             g.FillRectangle(brush, rightX, barBottom - timerFillH, barWidth, timerFillH);
         }
 
-        // Amber dot in top-right corner when LiteLLM has a network error (and isn't paused)
-        if (_spendNetworkError && !_spendPaused && _showSpend)
+        // Amber dot in top-right corner when either spend source has a network error
+        // (and isn't paused). One dot covers both — the tooltip names which.
+        if ((_spendNetworkError && !_spendPaused && _showSpend) ||
+            (_openRouterNetworkError && !_openRouterPaused && _showOpenRouter))
         {
             var amber = Drawing.Color.FromArgb(255, 183, 77);
             using var brush = new Drawing.SolidBrush(amber);
@@ -903,6 +1112,10 @@ public partial class MainWindow : Window
         }
         if (_spendNetworkError && !_spendPaused && _showSpend)
             tip += " | LiteLLM offline";
+        if (_openRouterNetworkError && !_openRouterPaused && _showOpenRouter)
+            tip += " | OpenRouter offline";
+        // NotifyIcon.Text throws above 63 chars; both offline suffixes can overshoot.
+        if (tip.Length > 63) tip = tip.Substring(0, 63);
         _trayIcon.Text = tip;
     }
 
@@ -921,6 +1134,7 @@ public partial class MainWindow : Window
         }
         _apiService.Dispose();
         _spendService.Dispose();
+        _openRouterService.Dispose();
         Application.Current.Shutdown();
     }
 
@@ -997,6 +1211,7 @@ public partial class MainWindow : Window
         }
         _apiService.Dispose();
         _spendService.Dispose();
+        _openRouterService.Dispose();
         base.OnClosed(e);
 
         // Safety net: force-kill the process so stale threadpool work

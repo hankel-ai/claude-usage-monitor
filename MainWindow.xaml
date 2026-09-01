@@ -5,7 +5,7 @@
         AllowsTransparency="True"
         Background="Transparent"
         ResizeMode="NoResize"
-        Width="350" Height="190"
+        Width="350" Height="240"
         ShowInTaskbar="False"
         MouseLeftButtonDown="Window_MouseLeftButtonDown">
 
@@ -26,6 +26,10 @@
                       IsCheckable="True" Click="PausePolling_Click"/>
             <MenuItem x:Name="PauseSpendMenuItem" Header="Pause LiteLLM Spend"
                       IsCheckable="True" Click="PauseSpend_Click"/>
+            <MenuItem x:Name="ShowOpenRouterMenuItem" Header="Show OpenRouter Spend"
+                      IsCheckable="True" IsChecked="True" Click="ShowOpenRouter_Click"/>
+            <MenuItem x:Name="PauseOpenRouterMenuItem" Header="Pause OpenRouter Spend"
+                      IsCheckable="True" Click="PauseOpenRouter_Click"/>
             <Separator/>
             <MenuItem Header="Settings..." Click="Settings_Click"/>
             <MenuItem Header="Refresh Now" Click="Refresh_Click"/>
@@ -61,6 +65,7 @@
                     <RowDefinition Height="2"/>
                     <RowDefinition x:Name="SevenDayTimerRow" Height="Auto"/>
                     <RowDefinition x:Name="SpendRow" Height="Auto"/>
+                    <RowDefinition x:Name="OpenRouterRow" Height="Auto"/>
                 </Grid.RowDefinitions>
 
                 <!-- 5-Hour Usage Meter -->
@@ -200,6 +205,35 @@
                     </Border>
                 </Grid>
 
+                <!-- OpenRouter Spend Meter -->
+                <Grid Grid.Row="8" x:Name="OpenRouterPanel" Margin="0,3,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="42"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="OpenRouterLabel" Text="OpenRouter" Foreground="#999" FontSize="8"
+                               FontFamily="Segoe UI" VerticalAlignment="Center"
+                               TextTrimming="None" Background="Transparent" Cursor="Hand"
+                               MouseLeftButtonDown="OpenRouterLabel_MouseLeftButtonDown"
+                               ToolTip="Open OpenRouter activity"/>
+                    <Border Grid.Column="1" Background="#2A2A2A" CornerRadius="3.5"
+                            Height="15" ClipToBounds="True"
+                            x:Name="OpenRouterTrack" Cursor="Hand"
+                            MouseLeftButtonDown="OpenRouterTrack_MouseLeftButtonDown"
+                            ToolTip="OpenRouter: No data">
+                        <Grid>
+                            <Border x:Name="OpenRouterFill" Background="#7E57C2"
+                                    HorizontalAlignment="Left" Width="0"/>
+                            <TextBlock x:Name="OpenRouterBarText" Text=""
+                                       Foreground="White" FontSize="9" FontWeight="SemiBold"
+                                       FontFamily="Segoe UI"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       IsHitTestVisible="False"
+                                       Effect="{StaticResource BarTextShadow}"/>
+                        </Grid>
+                    </Border>
+                </Grid>
+
                 <!-- Usage-section pause overlay (covers rows 0-6 only) -->
                 <Border x:Name="PausedOverlay" Grid.Row="0" Grid.RowSpan="7"
                         Background="#60000000"
@@ -221,6 +255,23 @@
                         Background="#60000000"
                         Visibility="Collapsed" IsHitTestVisible="False"
                         ToolTip="Cannot reach LiteLLM — connection failed">
+                    <TextBlock Text="Offline" Foreground="#FFB74D" FontSize="9" FontWeight="SemiBold"
+                               FontFamily="Segoe UI"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               IsHitTestVisible="False"
+                               Effect="{StaticResource BarTextShadow}"/>
+                </Border>
+
+                <!-- OpenRouter-section pause overlay (covers row 8 only) -->
+                <Border x:Name="OpenRouterPausedOverlay" Grid.Row="8"
+                        Background="#60000000"
+                        Visibility="Collapsed" IsHitTestVisible="False"/>
+
+                <!-- OpenRouter-section network-error overlay (covers row 8 only) -->
+                <Border x:Name="OpenRouterErrorOverlay" Grid.Row="8"
+                        Background="#60000000"
+                        Visibility="Collapsed" IsHitTestVisible="False"
+                        ToolTip="Cannot reach OpenRouter — connection failed">
                     <TextBlock Text="Offline" Foreground="#FFB74D" FontSize="9" FontWeight="SemiBold"
                                FontFamily="Segoe UI"
                                HorizontalAlignment="Center" VerticalAlignment="Center"

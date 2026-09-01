@@ -21,6 +21,27 @@ public class AppSettingsData
     public string LiteLLMSpendWindow { get; set; } = "MTD";
     public int LiteLLMPollingIntervalSeconds { get; set; } = 120;
     public bool LiteLLMSpendPaused { get; set; }
+
+    // --- OpenRouter spend meter ---
+    // No base URL setting: openrouter.ai is a hosted service, the root is a constant in
+    // OpenRouterSpendService. The key must be a *management* key, not an inference key.
+    public string OpenRouterApiKey { get; set; } = "";
+    public double OpenRouterMonthlyBudget { get; set; } = 50;
+    public bool ShowOpenRouterSpend { get; set; } = true;
+    public string OpenRouterSpendWindow { get; set; } = "MTD";
+    public int OpenRouterPollingIntervalSeconds { get; set; } = 300;
+    public bool OpenRouterSpendPaused { get; set; }
+
+    // Markers for the start of the current Eastern day and month, so Today and MTD can be read as
+    // live deltas of total_usage. /activity omits the in-progress UTC day (and therefore holds
+    // nothing at all for a new month until its first UTC day completes), so this is the only way
+    // to see current spend. Empty key = no baseline yet.
+    // See OpenRouterActivityParser.ResolvePeriodSpend.
+    // NOTE: earlier builds persisted OpenRouterDay*/OpenRouterMonth* "baseline" fields to track
+    // spend as a delta since the app first polled that day. That made the figures depend on the
+    // app having been running, so it was removed in favour of OpenRouter's own server-side
+    // counters (/keys usage_daily / usage_monthly). Any such keys left in settings.json are
+    // ignored and harmless — do not reintroduce them.
 }
 
 public static class AppSettingsService
@@ -114,6 +135,9 @@ public static class AppSettingsService
 
     /// <summary>True when a LiteLLM Vertex API key has been configured.</summary>
     public static bool HasLiteLLMKey => !string.IsNullOrWhiteSpace(Current.LiteLLMApiKey);
+
+    /// <summary>True when an OpenRouter management key has been configured.</summary>
+    public static bool HasOpenRouterKey => !string.IsNullOrWhiteSpace(Current.OpenRouterApiKey);
 
     /// <summary>
     /// Reads the token expiry from claudeAiOauth.expiresAt (Unix milliseconds).

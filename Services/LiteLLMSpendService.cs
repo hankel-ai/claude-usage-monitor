@@ -89,117 +89,27 @@ public static class SpendWindowExtensions
 /// total dollar figure. Lightweight sibling of <see cref="ClaudeApiService"/> — no 429
 /// backoff machinery; transient failures are simply logged and retried next tick.
 /// </summary>
-public class LiteLLMSpendService : IDisposable
+public class LiteLLMSpendService : SpendServiceBase
 {
-    private static readonly string LogPath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "ClaudeUsageMonitor", "log.txt");
-
     // Explicit Eastern zone (the Windows id auto-handles EST/EDT) — the spend report's day
     // boundaries are pinned to Eastern regardless of the machine's local timezone.
     private static readonly TimeZoneInfo Eastern =
         TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
 
-    private HttpClient? _httpClient;
-    private string? _httpClientBaseUrl;
-    private Timer? _timer;
-    private volatile bool _stopped = true;
-    private CancellationTokenSource? _cts;
-    private int _pollIntervalSeconds = 120;
-    private int _pollInProgress;
+    protected override string BaseUrl => AppSettingsService.Current.LiteLLMBaseUrl;
+    protected override string DefaultBaseUrl => "https://litellm.example.com";
 
     /// <summary>The window that is currently polled. Set before polling / on click-cycle.</summary>
     public SpendWindow CurrentWindow { get; set; } = SpendWindow.MonthToDate;
 
     /// <summary>Fired with the total spend (USD) for <see cref="CurrentWindow"/>.</summary>
     public event Action<double>? SpendUpdated;
-    public event Action<string>? SpendError;
-    /// <summary>Fired when the HTTP request fails at the transport level (DNS, refused, timeout).</summary>
-    public event Action? NetworkError;
 
-    private static void Log(string message)
+    protected override async Task PollOnceAsync(CancellationToken ct)
     {
-        try
-        {
-            var dir = Path.GetDirectoryName(LogPath)!;
-            if (!Directory.Exists(dir))
-                Directory.CreateDirectory(dir);
-            if (File.Exists(LogPath) && new FileInfo(LogPath).Length > 1_000_000)
-                File.WriteAllText(LogPath, "");
-            File.AppendAllText(LogPath,
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  {message}{Environment.NewLine}");
-        }
-        catch { }
-    }
-
-    private HttpClient EnsureHttpClient()
-    {
-        var baseUrl = AppSettingsService.Current.LiteLLMBaseUrl?.TrimEnd('/');
-        if (string.IsNullOrWhiteSpace(baseUrl))
-            baseUrl = "https://litellm.example.com";
-
-        // Rebuild the client if the configured base URL changed.
-        if (_httpClient != null && _httpClientBaseUrl != baseUrl)
-        {
-            _httpClient.Dispose();
-            _httpClient = null;
-        }
-
-        if (_httpClient == null)
-        {
-            _httpClient = new HttpClient
-            {
-                BaseAddress = new Uri(baseUrl),
-                Timeout = TimeSpan.FromSeconds(30)
-            };
-            _httpClientBaseUrl = baseUrl;
-        }
-
-        return _httpClient;
-    }
-
-    public void StartPolling(int intervalSeconds)
-    {
-        StopPolling();
-        _pollIntervalSeconds = Math.Max(60, intervalSeconds);
-        _stopped = false;
-        _cts = new CancellationTokenSource();
-        _timer = new Timer(async _ => await PollAndRescheduleAsync(), null,
-            TimeSpan.Zero, Timeout.InfiniteTimeSpan);
-    }
-
-    public void StopPolling()
-    {
-        _stopped = true;
-        _cts?.Cancel();
-        _timer?.Dispose();
-        _timer = null;
-    }
-
-    /// <summary>Fetch immediately for the current window (e.g. after a click-cycle).</summary>
-    public void RefreshNow()
-    {
-        if (_stopped) return;
-        _timer?.Change(TimeSpan.Zero, Timeout.InfiniteTimeSpan);
-    }
-
-    private async Task PollAndRescheduleAsync()
-    {
-        if (_stopped) return;
-        if (Interlocked.Exchange(ref _pollInProgress, 1) == 1)
-            return;
-        try
-        {
-            var spend = await FetchSpendAsync(CurrentWindow, _cts?.Token ?? CancellationToken.None);
-            if (spend.HasValue)
-                SpendUpdated?.Invoke(spend.Value);
-        }
-        finally
-        {
-            Interlocked.Exchange(ref _pollInProgress, 0);
-            if (!_stopped)
-                _timer?.Change(TimeSpan.FromSeconds(_pollIntervalSeconds), Timeout.InfiniteTimeSpan);
-        }
+        var spend = await FetchSpendAsync(CurrentWindow, ct);
+        if (spend.HasValue)
+            SpendUpdated?.Invoke(spend.Value);
     }
 
     /// <summary>
@@ -213,7 +123,7 @@ public class LiteLLMSpendService : IDisposable
             var key = AppSettingsService.Current.LiteLLMApiKey;
             if (string.IsNullOrWhiteSpace(key))
             {
-                SpendError?.Invoke("No LiteLLM API key configured");
+                RaiseError("No LiteLLM API key configured");
                 return null;
             }
 
@@ -239,7 +149,7 @@ public class LiteLLMSpendService : IDisposable
             if (response.StatusCode == HttpStatusCode.Unauthorized ||
                 response.StatusCode == HttpStatusCode.Forbidden)
             {
-                SpendError?.Invoke("LiteLLM auth failed (check key)");
+                RaiseError("LiteLLM auth failed (check key)");
                 return null;
             }
 
@@ -250,7 +160,7 @@ public class LiteLLMSpendService : IDisposable
             if (spend.HasValue)
                 Log($"OK    LiteLLM spend {window.Tag()} = ${spend.Value:0.00}");
             else
-                SpendError?.Invoke("LiteLLM: no spend in response");
+                RaiseError("LiteLLM: no spend in response");
             return spend;
         }
         catch (OperationCanceledException)
@@ -260,15 +170,15 @@ public class LiteLLMSpendService : IDisposable
         catch (HttpRequestException ex)
         {
             Log($"ERROR LiteLLM network: {ex.Message}");
-            SpendError?.Invoke($"LiteLLM network error");
+            RaiseError($"LiteLLM network error");
             if (ex.StatusCode == null)
-                NetworkError?.Invoke();
+                RaiseNetworkError();
             return null;
         }
         catch (Exception ex)
         {
             Log($"ERROR LiteLLM: {ex.Message}");
-            SpendError?.Invoke($"LiteLLM error");
+            RaiseError($"LiteLLM error");
             return null;
         }
     }
@@ -343,7 +253,7 @@ public class LiteLLMSpendService : IDisposable
             if (response.StatusCode == HttpStatusCode.Unauthorized ||
                 response.StatusCode == HttpStatusCode.Forbidden)
             {
-                SpendError?.Invoke("LiteLLM auth failed (check key)");
+                RaiseError("LiteLLM auth failed (check key)");
                 return null;
             }
 
@@ -352,7 +262,7 @@ public class LiteLLMSpendService : IDisposable
             var json = await response.Content.ReadAsStringAsync(ct);
             if (!TryParseGranularPage(json, out var pageSum, out totalPages))
             {
-                SpendError?.Invoke("LiteLLM: bad spend/logs response");
+                RaiseError("LiteLLM: bad spend/logs response");
                 return null;
             }
 
@@ -394,13 +304,5 @@ public class LiteLLMSpendService : IDisposable
         {
             return false;
         }
-    }
-
-    public void Dispose()
-    {
-        StopPolling();
-        _httpClient?.Dispose();
-        _cts?.Dispose();
-        _cts = null;
     }
 }

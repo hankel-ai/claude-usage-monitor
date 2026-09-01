@@ -8,6 +8,7 @@ A lightweight Windows desktop widget that displays your Claude AI usage as visua
 
 - **Two usage meters** — 5-hour (green) and 7-day (blue) utilization bars
 - **LiteLLM Vertex spend meter** — optional third bar showing Total Spend from a LiteLLM proxy against a monthly budget; click to cycle the time window (Today / 7d / 30d / MTD / YTD)
+- **OpenRouter spend meter** — optional fourth bar showing account-wide OpenRouter spend against a monthly budget; click to cycle Today / 7d / 30d / MTD / **Bal** (remaining credit balance)
 - **Delta highlights** — usage increase since last poll shown as a brighter strip at the end of each bar
 - **Reset timer bars** — optional thin red bars showing time elapsed in each rate limit window
 - **Color thresholds** — bars turn orange at 70% and red at 90%
@@ -115,10 +116,65 @@ Authorization: Bearer <litellm-key>
 and reads `metadata.total_spend` from the response — the same figure shown on the LiteLLM Usage page.
 Date ranges are computed in local time from the selected window.
 
+## OpenRouter Spend Meter
+
+An optional fourth bar shows **account-wide OpenRouter spend** and your remaining credit balance.
+
+- **On by default** once a key is configured; toggle via right-click → **Show OpenRouter Spend**.
+- **Click the bar** to cycle **Today → 7d → 30d → MTD → Bal**. The four window stops fill toward a
+  monthly budget (default `$50`, orange at 70% / red at 90%). The **Bal** stop switches the bar to a
+  credit meter: it fills with credits *consumed*, and the text reads e.g. `Bal  $37.60 left`.
+- Cycling is instant — one poll caches every window, so clicking never triggers a request.
+- The hover tooltip always shows the other half: spend stops include the credit line, and **Bal**
+  includes month-to-date spend.
+
+### Configuration
+
+Right-click → **Settings** → **OpenRouter Spend**:
+
+- **Management API key** — **must** be a management key from
+  openrouter.ai → Settings → Management API Keys. A normal `sk-or-v1-...` inference key returns
+  **403** and the bar tooltip will say `OpenRouter: management key required`. Stored in `settings.json`.
+- **Monthly budget (USD)** — the ceiling the four window stops fill toward (default `50`).
+- **Polling interval** — default 5 minutes, independent of both the Claude and LiteLLM pollers.
+
+There is no base-URL setting; openrouter.ai is a hosted service and the API root is a constant.
+
+### API endpoints
+
+Two Bearer-authenticated calls per poll:
+
+```
+GET https://openrouter.ai/api/v1/activity     -> data[] rows: { date, model, usage, requests, ... }
+GET https://openrouter.ai/api/v1/credits      -> data: { total_credits, total_usage }
+```
+
+Only `usage` is summed from the activity rows. `byok_usage_inference` is deliberately excluded —
+BYOK traffic is billed by the upstream provider, not out of OpenRouter credits, so counting it
+would inflate spend against an OpenRouter budget.
+
+### Timezone and history limits
+
+Two constraints come straight from the API and cannot be worked around client-side:
+
+- **Every figure is stateless.** All of them are counters OpenRouter maintains server-side, read
+  fresh on each poll. The widget stores no spend data of its own, so you can shut it down for a
+  week and the numbers are still correct when it comes back — nothing degrades with downtime.
+- **`Today` and `MTD` use UTC boundaries.** They come from `usage_daily` / `usage_monthly`, which
+  reset at UTC midnight — **8pm Eastern**, not local midnight. This differs from the LiteLLM bar,
+  which uses Eastern days. The tooltip names the zone.
+  This is a deliberate trade: an Eastern-accurate day would require the widget to track spend
+  deltas continuously, which makes the number wrong whenever the app isn't running. Statelessness
+  was judged more important. (The per-request granularity behind openrouter.ai's own charts comes
+  from a private, cookie-authenticated endpoint that rejects API keys, so it isn't an option.)
+- **`7d` / `30d` are the completed daily buckets plus today's counter**, so the windows nest
+  properly (`Today` ≤ `7d` ≤ `30d`).
+- **History is capped at 30 days**, which is why there is no YTD stop.
+
 ### App settings location
 
 The app stores its own settings (polling interval, window position, always-on-top preference,
-LiteLLM key/URL/budget/window) at:
+LiteLLM key/URL/budget/window, OpenRouter key/budget/window) at:
 
 ```
 %APPDATA%\ClaudeUsageMonitor\settings.json
@@ -245,7 +301,11 @@ The widget appears as a small floating panel near the bottom-right of your scree
 |--------|-------------|
 | **Always on Top** | Toggle whether the widget stays above other windows |
 | **Show Reset Timers** | Toggle the thin red elapsed-time bars under each meter |
+| **Show LiteLLM Spend** | Toggle the LiteLLM spend bar (only appears when a key is configured) |
+| **Show OpenRouter Spend** | Toggle the OpenRouter bar (only appears when a management key is configured) |
 | **Pause Polling** | Stop API polling. The widget dims with a semi-transparent overlay to indicate it is paused. Unchecking resumes polling. |
+| **Pause LiteLLM Spend** | Stop LiteLLM spend polling only; the Claude meters keep updating |
+| **Pause OpenRouter Spend** | Stop OpenRouter polling only; the other meters keep updating |
 | **Settings...** | Open settings (polling interval, credentials status, startup toggle) |
 | **Refresh Now** | Immediately re-fetch usage data (disabled while paused) |
 | **Exit** | Close the app |

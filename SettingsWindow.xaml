@@ -135,6 +135,54 @@
                     </StackPanel>
                 </Border>
 
+                <!-- OpenRouter Spend -->
+                <Border BorderBrush="#333" BorderThickness="0,1,0,0" Margin="0,16,0,0" Padding="0,12,0,0">
+                    <StackPanel>
+                        <TextBlock Text="OpenRouter Spend" Foreground="#CCC" FontSize="12"
+                                   FontWeight="SemiBold"/>
+
+                        <TextBlock Text="Management API key" Foreground="#CCC" FontSize="12"
+                                   Margin="0,10,0,4"/>
+                        <PasswordBox x:Name="OpenRouterKeyBox" FontSize="12" Padding="4,3"
+                                     Background="#2A2A2A" Foreground="#EEE" BorderBrush="#555"/>
+                        <TextBlock TextWrapping="Wrap"
+                                   Text="Must be a management key (openrouter.ai → Settings → Management API Keys). A normal sk-or-v1 inference key returns 403. Stored in settings.json."
+                                   Foreground="#777" FontSize="10.5" Margin="0,4,0,0"/>
+
+                        <TextBlock Text="Monthly budget (USD)" Foreground="#CCC" FontSize="12"
+                                   Margin="0,12,0,4"/>
+                        <TextBox x:Name="OpenRouterBudgetBox" FontSize="12" Padding="4,3" Width="120"
+                                 HorizontalAlignment="Left"
+                                 Background="#2A2A2A" Foreground="#EEE" BorderBrush="#555"/>
+                        <TextBlock Text="The Today / 7d / 30d / MTD stops fill toward this budget. The Bal stop shows credits instead."
+                                   TextWrapping="Wrap"
+                                   Foreground="#777" FontSize="10.5" Margin="0,4,0,0"/>
+
+                        <TextBlock Text="OpenRouter polling interval" Foreground="#CCC" FontSize="12"
+                                   Margin="0,12,0,4"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Slider x:Name="OpenRouterIntervalSlider"
+                                    Minimum="60" Maximum="3600"
+                                    Value="300"
+                                    TickFrequency="60"
+                                    IsSnapToTickEnabled="True"
+                                    VerticalAlignment="Center"
+                                    ValueChanged="OpenRouterIntervalSlider_ValueChanged"/>
+                            <TextBlock x:Name="OpenRouterIntervalLabel" Grid.Column="1"
+                                       Foreground="#EEE" FontSize="13" FontWeight="SemiBold"
+                                       Width="80" TextAlignment="Right"
+                                       VerticalAlignment="Center" Margin="12,0,0,0"/>
+                        </Grid>
+                        <TextBlock TextWrapping="Wrap"
+                                   Text="Day boundaries are UTC here, unlike the LiteLLM bar's Eastern boundaries — OpenRouter buckets usage by UTC date and offers no per-request export."
+                                   Foreground="#777" FontSize="10.5" Margin="0,4,0,0"/>
+                    </StackPanel>
+                </Border>
+
             </StackPanel>
             </ScrollViewer>
         </GroupBox>

@@ -20,9 +20,15 @@ public partial class SettingsWindow : Window
             .ToString(System.Globalization.CultureInfo.InvariantCulture);
         SpendIntervalSlider.Value = AppSettingsService.Current.LiteLLMPollingIntervalSeconds;
 
+        OpenRouterKeyBox.Password = AppSettingsService.Current.OpenRouterApiKey;
+        OpenRouterBudgetBox.Text = AppSettingsService.Current.OpenRouterMonthlyBudget
+            .ToString(System.Globalization.CultureInfo.InvariantCulture);
+        OpenRouterIntervalSlider.Value = AppSettingsService.Current.OpenRouterPollingIntervalSeconds;
+
         UpdateIntervalLabel();
         UpdateHoverDelayLabel();
         UpdateSpendIntervalLabel();
+        UpdateOpenRouterIntervalLabel();
         UpdateAuthStatus();
     }
 
@@ -88,6 +94,27 @@ public partial class SettingsWindow : Window
         }
     }
 
+    private void OpenRouterIntervalSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        UpdateOpenRouterIntervalLabel();
+    }
+
+    private void UpdateOpenRouterIntervalLabel()
+    {
+        if (OpenRouterIntervalLabel == null) return;
+        var seconds = (int)OpenRouterIntervalSlider.Value;
+        if (seconds >= 60)
+        {
+            var min = seconds / 60;
+            var sec = seconds % 60;
+            OpenRouterIntervalLabel.Text = sec > 0 ? $"{min}m {sec}s" : $"{min} min";
+        }
+        else
+        {
+            OpenRouterIntervalLabel.Text = $"{seconds}s";
+        }
+    }
+
     private void UpdateHoverDelayLabel()
     {
         if (HoverDelayLabel == null) return;
@@ -110,6 +137,15 @@ public partial class SettingsWindow : Window
                 System.Globalization.CultureInfo.InvariantCulture, out var budget) && budget > 0)
         {
             AppSettingsService.Current.LiteLLMMonthlyBudget = budget;
+        }
+
+        AppSettingsService.Current.OpenRouterApiKey = OpenRouterKeyBox.Password.Trim();
+        AppSettingsService.Current.OpenRouterPollingIntervalSeconds = (int)OpenRouterIntervalSlider.Value;
+        if (double.TryParse(OpenRouterBudgetBox.Text.Trim(),
+                System.Globalization.NumberStyles.Any,
+                System.Globalization.CultureInfo.InvariantCulture, out var orBudget) && orBudget > 0)
+        {
+            AppSettingsService.Current.OpenRouterMonthlyBudget = orBudget;
         }
 
         AppSettingsService.Save();
