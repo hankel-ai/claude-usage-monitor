@@ -12,6 +12,7 @@ public class AppSettingsData
     public double WindowLeft { get; set; } = -1;
     public double WindowTop { get; set; } = -1;
     public int HoverZoomDelayMs { get; set; } = 300;
+    public bool AlwaysZoomed { get; set; } = false;
 
     // --- LiteLLM Vertex spend meter ---
     public string LiteLLMApiKey { get; set; } = "";

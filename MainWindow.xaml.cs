@@ -76,6 +76,8 @@ public partial class MainWindow : Window
         var settings = AppSettingsService.Current;
         Topmost = settings.AlwaysOnTop;
         AlwaysOnTopMenuItem.IsChecked = settings.AlwaysOnTop;
+        AlwaysZoomedMenuItem.IsChecked = settings.AlwaysZoomed;
+        ApplyDesiredZoom(animate: false);
 
         var area = SystemParameters.WorkArea;
         if (settings.WindowLeft >= 0 && settings.WindowTop >= 0 &&
@@ -749,9 +751,13 @@ public partial class MainWindow : Window
 
     private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        _hoverDelayTimer?.Stop();
-        _suppressZoom = true;
-        AnimateScale(1.0, 100);
+        // In always-zoomed mode the widget keeps its 1.5x scale while dragged.
+        if (!AppSettingsService.Current.AlwaysZoomed)
+        {
+            _hoverDelayTimer?.Stop();
+            _suppressZoom = true;
+            AnimateScale(1.0, 100);
+        }
 
         // Highlight border during drag
         OuterBorder.BorderBrush = DragBorderBrush;
@@ -803,6 +809,13 @@ public partial class MainWindow : Window
         Topmost = AlwaysOnTopMenuItem.IsChecked;
         AppSettingsService.Current.AlwaysOnTop = Topmost;
         AppSettingsService.Save();
+    }
+
+    private void AlwaysZoomed_Click(object sender, RoutedEventArgs e)
+    {
+        AppSettingsService.Current.AlwaysZoomed = AlwaysZoomedMenuItem.IsChecked;
+        AppSettingsService.Save();
+        ApplyDesiredZoom(animate: true);
     }
 
     private void ShowResetTimers_Click(object sender, RoutedEventArgs e)
@@ -1149,6 +1162,13 @@ public partial class MainWindow : Window
 
     private void OuterBorder_MouseEnter(object sender, MouseEventArgs e)
     {
+        if (AppSettingsService.Current.AlwaysZoomed)
+        {
+            // Already at 1.5x permanently; just keep the tooltip gate satisfied.
+            _hoverDelayTimer?.Stop();
+            _isZoomed = true;
+            return;
+        }
         _isZoomed = false;
         SetTooltipsEnabled(false);
         if (_suppressZoom) return;
@@ -1177,6 +1197,11 @@ public partial class MainWindow : Window
     {
         _hoverDelayTimer?.Stop();
         _suppressZoom = false;
+        if (AppSettingsService.Current.AlwaysZoomed)
+        {
+            _isZoomed = true;
+            return;
+        }
         _isZoomed = false;
         SetTooltipsEnabled(false);
         AnimateScale(1.0, 150);
@@ -1186,6 +1211,27 @@ public partial class MainWindow : Window
     {
         if (_isZoomed && !_tooltipsEnabled)
             SetTooltipsEnabled(true);
+    }
+
+    /// <summary>
+    /// Reconciles the border scale with the AlwaysZoomed setting. On: pin at 1.5x
+    /// (tooltips stay gated on _isZoomed). Off: return to 1.0x; normal hover zoom resumes.
+    /// </summary>
+    private void ApplyDesiredZoom(bool animate)
+    {
+        _hoverDelayTimer?.Stop();
+        if (AppSettingsService.Current.AlwaysZoomed)
+        {
+            _suppressZoom = false;
+            _isZoomed = true;
+            AnimateScale(1.5, animate ? 150 : 0);
+        }
+        else
+        {
+            _isZoomed = false;
+            SetTooltipsEnabled(false);
+            AnimateScale(1.0, animate ? 150 : 0);
+        }
     }
 
     private void AnimateScale(double targetScale, int durationMs)

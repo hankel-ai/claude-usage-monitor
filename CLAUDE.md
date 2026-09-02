@@ -49,6 +49,12 @@ optional **OpenRouter spend** bar (account-wide spend + credit balance from open
   the XAML `Window Height` are coupled by the 1.5x hover zoom**: the Window must be taller than
   `BaseContentHeight * 1.5` (119 * 1.5 = 178.5, hence `Height="240"`) or the bottom bar clips while
   zoomed. Adding a fifth bar means bumping both.
+- **Zoom has two modes.** Default is hover-zoom (1.5x via `MouseEnter`/`MouseLeave`, delayed by
+  `HoverZoomDelayMs`). **`AlwaysZoomed`** (bool, persisted; toggle = `Always Zoomed` context-menu
+  item) pins the scale at 1.5x permanently — dragging keeps it zoomed too. The three un-zoom paths
+  (`OuterBorder_MouseLeave`, `Window_MouseLeftButtonDown`, `MouseEnter`'s `_isZoomed = false`)
+  each early-out on the setting; `ApplyDesiredZoom` reconciles scale + `_isZoomed` (which gates
+  tooltips) when the toggle flips or at startup.
 - **OpenRouter meter** (`Services/OpenRouterSpendService.cs`):
   - Requires a **management key** (openrouter.ai → Settings → Management API Keys). A normal
     `sk-or-v1-...` inference key gets **403** from both endpoints — that case has its own message

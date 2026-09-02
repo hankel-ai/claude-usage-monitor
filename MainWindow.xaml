@@ -18,6 +18,8 @@
         <ContextMenu>
             <MenuItem x:Name="AlwaysOnTopMenuItem" Header="Always on Top"
                       IsCheckable="True" IsChecked="True" Click="AlwaysOnTop_Click"/>
+            <MenuItem x:Name="AlwaysZoomedMenuItem" Header="Always Zoomed"
+                      IsCheckable="True" Click="AlwaysZoomed_Click"/>
             <MenuItem x:Name="ShowResetTimersMenuItem" Header="Show Reset Timers"
                       IsCheckable="True" IsChecked="True" Click="ShowResetTimers_Click"/>
             <MenuItem x:Name="ShowLiteLLMSpendMenuItem" Header="Show LiteLLM Spend"
